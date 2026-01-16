@@ -4,7 +4,7 @@ import type { WritingNode, WritingEdge, Project, ProjectSettings, ViewState } fr
 function createDefaultSettings(): ProjectSettings {
 	return {
 		fontFamily: 'literata',
-		theme: 'light',
+		theme: 'sepia',
 		fontSize: 'medium'
 	};
 }

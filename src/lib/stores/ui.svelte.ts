@@ -6,6 +6,14 @@ class UIStore {
 	private _rightPaneMode = $state<RightPaneMode>('writing');
 	private _planePaneWidth = $state<number>(300);
 
+	// Node Browser
+	private _nodeBrowserOpen = $state<boolean>(true);
+	private _nodeBrowserWidth = $state<number>(200);
+
+	// Multi-select state
+	private _selectedNodeIds = $state<Set<string>>(new Set());
+	private _lastSelectedNodeId = $state<string | null>(null);
+
 	// Overlays
 	private _commandPaletteOpen = $state<boolean>(false);
 	private _focusModeActive = $state<boolean>(false);
@@ -50,6 +58,102 @@ class UIStore {
 
 	setPlanePaneWidth(width: number): void {
 		this._planePaneWidth = Math.max(200, Math.min(600, width));
+	}
+
+	// Node Browser getters/setters
+	get nodeBrowserOpen(): boolean {
+		return this._nodeBrowserOpen;
+	}
+
+	toggleNodeBrowser(): void {
+		this._nodeBrowserOpen = !this._nodeBrowserOpen;
+	}
+
+	openNodeBrowser(): void {
+		this._nodeBrowserOpen = true;
+	}
+
+	closeNodeBrowser(): void {
+		this._nodeBrowserOpen = false;
+	}
+
+	get nodeBrowserWidth(): number {
+		return this._nodeBrowserWidth;
+	}
+
+	setNodeBrowserWidth(width: number): void {
+		this._nodeBrowserWidth = Math.max(150, Math.min(400, width));
+	}
+
+	// Multi-select getters/methods
+	get selectedNodeIds(): Set<string> {
+		return this._selectedNodeIds;
+	}
+
+	get lastSelectedNodeId(): string | null {
+		return this._lastSelectedNodeId;
+	}
+
+	isNodeSelected(nodeId: string): boolean {
+		return this._selectedNodeIds.has(nodeId);
+	}
+
+	get hasMultiSelection(): boolean {
+		return this._selectedNodeIds.size > 1;
+	}
+
+	// Clear multi-selection
+	clearMultiSelection(): void {
+		this._selectedNodeIds = new Set();
+		this._lastSelectedNodeId = null;
+	}
+
+	// Toggle a single node in selection (Ctrl+click)
+	toggleNodeSelection(nodeId: string): void {
+		const newSet = new Set(this._selectedNodeIds);
+		if (newSet.has(nodeId)) {
+			newSet.delete(nodeId);
+		} else {
+			newSet.add(nodeId);
+		}
+		this._selectedNodeIds = newSet;
+		this._lastSelectedNodeId = nodeId;
+	}
+
+	// Select a range of nodes (Ctrl+Shift+click)
+	selectNodeRange(nodeId: string, sortedNodeIds: string[]): void {
+		if (!this._lastSelectedNodeId) {
+			// No previous selection, just select this one
+			this._selectedNodeIds = new Set([nodeId]);
+			this._lastSelectedNodeId = nodeId;
+			return;
+		}
+
+		const lastIndex = sortedNodeIds.indexOf(this._lastSelectedNodeId);
+		const currentIndex = sortedNodeIds.indexOf(nodeId);
+
+		if (lastIndex === -1 || currentIndex === -1) {
+			// Node not in list, just select this one
+			this._selectedNodeIds = new Set([nodeId]);
+			this._lastSelectedNodeId = nodeId;
+			return;
+		}
+
+		const startIndex = Math.min(lastIndex, currentIndex);
+		const endIndex = Math.max(lastIndex, currentIndex);
+
+		const newSet = new Set(this._selectedNodeIds);
+		for (let i = startIndex; i <= endIndex; i++) {
+			newSet.add(sortedNodeIds[i]);
+		}
+		this._selectedNodeIds = newSet;
+		// Keep lastSelectedNodeId as is for range selection anchor
+	}
+
+	// Set single selection (regular click)
+	setSingleSelection(nodeId: string): void {
+		this._selectedNodeIds = new Set([nodeId]);
+		this._lastSelectedNodeId = nodeId;
 	}
 
 	// Overlay getters/setters

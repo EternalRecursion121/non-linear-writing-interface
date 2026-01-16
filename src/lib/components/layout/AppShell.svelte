@@ -9,22 +9,42 @@
 	import CompilePanel from '$lib/components/dag/CompilePanel.svelte';
 	import ToastContainer from '$lib/components/overlays/ToastContainer.svelte';
 	import { createKeyboardHandler } from '$lib/utils/keyboard';
-	import { branchAtCursor } from '$lib/utils/branching';
+	import { branchAtCursor, parallelizeAtSelection, parallelizeAtCursor } from '$lib/utils/branching';
 	import { saveProjectToFile, saveToLocalStorage } from '$lib/utils/persistence';
 	import { onMount } from 'svelte';
+	import { Check, Circle } from 'lucide-svelte';
 
 	let branchCallback: ((cursorPosition: number) => void) | null = null;
+	let parallelizeCallback: ((selectionStart: number, selectionEnd: number) => void) | null = null;
 	let autosaveTimeout: ReturnType<typeof setTimeout> | null = null;
 
 	function setBranchCallback(callback: (cursorPosition: number) => void) {
 		branchCallback = callback;
 	}
 
+	function setParallelizeCallback(callback: (selectionStart: number, selectionEnd: number) => void) {
+		parallelizeCallback = callback;
+	}
+
 	function handleBranch(cursorPosition: number) {
+		console.log('[AppShell] handleBranch called with position:', cursorPosition);
 		const selectedNode = projectStore.selectedNode;
-		if (!selectedNode) return;
+		if (!selectedNode) {
+			console.log('[AppShell] No selected node, returning');
+			return;
+		}
+		console.log('[AppShell] Selected node:', selectedNode.id);
+		console.log('[AppShell] Content:', JSON.stringify(selectedNode.content));
+		console.log('[AppShell] Content length:', selectedNode.content.length);
+		console.log('[AppShell] Text BEFORE cursor:', JSON.stringify(selectedNode.content.slice(0, cursorPosition)));
+		console.log('[AppShell] Text AFTER cursor:', JSON.stringify(selectedNode.content.slice(cursorPosition)));
 
 		const result = branchAtCursor(selectedNode, cursorPosition, selectedNode.position);
+
+		console.log('[AppShell] Branch result:');
+		console.log('  - Original node content:', JSON.stringify(result.originalNode.content));
+		console.log('  - Continuation node content:', JSON.stringify(result.continuationNode.content));
+		console.log('  - Branch node content:', JSON.stringify(result.branchNode.content));
 
 		// Update original node
 		projectStore.updateNode(result.originalNode.id, {
@@ -43,6 +63,78 @@
 		projectStore.selectNode(branchNode.id);
 		uiStore.setEditing(true);
 		uiStore.showToast('Branch created', 'success');
+	}
+
+	function handleParallelize(selectionStart: number, selectionEnd: number) {
+		console.log('[AppShell] handleParallelize called');
+		console.log('[AppShell] selectionStart:', selectionStart, 'selectionEnd:', selectionEnd);
+
+		const selectedNode = projectStore.selectedNode;
+		if (!selectedNode) {
+			console.log('[AppShell] No selected node');
+			return;
+		}
+
+		console.log('[AppShell] Content:', JSON.stringify(selectedNode.content));
+		console.log('[AppShell] Selected text:', JSON.stringify(selectedNode.content.slice(selectionStart, selectionEnd)));
+
+		// If there's a selection, create one new branch with highlighted text removed
+		if (selectionStart !== selectionEnd) {
+			console.log('[AppShell] Has selection, creating branch without highlighted text');
+			const result = parallelizeAtSelection(
+				selectedNode,
+				selectionStart,
+				selectionEnd,
+				selectedNode.position
+			);
+
+			console.log('[AppShell] Parallelize result:');
+			console.log('  - Original content:', JSON.stringify(result.originalNode.content));
+			console.log('  - New branch content:', JSON.stringify(result.selectedPathNode.content));
+
+			// Original stays unchanged (no update needed)
+
+			// Add the new branch node
+			const branchNode = projectStore.addNode(result.selectedPathNode);
+
+			// Add edge from original to new branch
+			projectStore.addEdge(result.originalNode.id, branchNode.id);
+
+			// Select the new branch node
+			projectStore.selectNode(branchNode.id);
+			uiStore.setEditing(true);
+			uiStore.showToast('Branch created (highlighted text removed)', 'success');
+		} else {
+			// No selection - try to insert parallel path to existing child
+			const children = projectStore.getChildren(selectedNode.id);
+			const result = parallelizeAtCursor(
+				selectedNode,
+				selectionStart,
+				selectedNode.position,
+				children,
+				projectStore.edges
+			);
+
+			if (result) {
+				const emptyPathNode = projectStore.addNode(result.emptyPathNode);
+
+				// Add new edges
+				for (const edge of result.newEdges) {
+					if (edge.source === selectedNode.id) {
+						projectStore.addEdge(selectedNode.id, emptyPathNode.id);
+					} else {
+						projectStore.addEdge(emptyPathNode.id, edge.target);
+					}
+				}
+
+				projectStore.selectNode(emptyPathNode.id);
+				uiStore.setEditing(true);
+				uiStore.showToast('Parallel path added', 'success');
+			} else {
+				// No children - just do a regular branch
+				handleBranch(selectionStart);
+			}
+		}
 	}
 
 	const keyboardHandler = createKeyboardHandler({
@@ -106,7 +198,8 @@
 	}
 </script>
 
-<svelte:window on:keydown={handleKeydown} />
+<!-- Use Svelte 5 syntax for window events -->
+<svelte:window onkeydown={handleKeydown} />
 
 <div
 	class="h-screen flex flex-col overflow-hidden"
@@ -119,7 +212,7 @@
 
 	<!-- Main Content -->
 	<div class="flex-1 overflow-hidden">
-		<TwoPaneLayout {handleBranch} {setBranchCallback} />
+		<TwoPaneLayout {handleBranch} {setBranchCallback} {handleParallelize} {setParallelizeCallback} />
 	</div>
 
 	<!-- Status Bar -->
@@ -132,11 +225,11 @@
 				<!-- Save Status -->
 				<span class="flex items-center gap-1">
 					{#if uiStore.autosaveState.status === 'saved'}
-						<span class="text-green-500">✓</span> Saved
+						<Check size={12} class="text-green-500" /> Saved
 					{:else if uiStore.autosaveState.status === 'saving'}
-						<span class="animate-pulse">●</span> Saving...
+						<Circle size={10} class="animate-pulse" /> Saving...
 					{:else}
-						<span class="text-yellow-500">●</span> Unsaved
+						<Circle size={10} class="text-yellow-500" /> Unsaved
 					{/if}
 				</span>
 

@@ -6,13 +6,17 @@
 	interface Props {
 		handleBranch: (cursorPosition: number) => void;
 		setBranchCallback: (callback: (cursorPosition: number) => void) => void;
+		handleParallelize: (selectionStart: number, selectionEnd: number) => void;
+		setParallelizeCallback: (callback: (selectionStart: number, selectionEnd: number) => void) => void;
 	}
 
-	let { handleBranch, setBranchCallback }: Props = $props();
+	let { handleBranch, setBranchCallback, handleParallelize, setParallelizeCallback }: Props = $props();
 
 	let editorRef: HTMLTextAreaElement;
 	let localContent = $state('');
 	let cursorPosition = $state(0);
+	let selectionStart = $state(0);
+	let selectionEnd = $state(0);
 
 	// Sync content with selected node
 	$effect(() => {
@@ -31,6 +35,13 @@
 		});
 	});
 
+	// Register parallelize callback
+	$effect(() => {
+		setParallelizeCallback((start: number, end: number) => {
+			handleParallelize(start, end);
+		});
+	});
+
 	function handleInput(e: Event) {
 		const target = e.target as HTMLTextAreaElement;
 		localContent = target.value;
@@ -45,17 +56,36 @@
 	function handleSelect(e: Event) {
 		const target = e.target as HTMLTextAreaElement;
 		cursorPosition = target.selectionStart;
+		selectionStart = target.selectionStart;
+		selectionEnd = target.selectionEnd;
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
+		console.log('[WritingEditor] keydown:', e.key, 'ctrl:', e.ctrlKey, 'meta:', e.metaKey);
+
 		// Handle Ctrl+L for branching
 		if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'l') {
+			console.log('[WritingEditor] Ctrl+L detected! Branching...');
 			e.preventDefault();
 			e.stopPropagation();
 
 			if (editorRef) {
 				const pos = editorRef.selectionStart;
+				console.log('[WritingEditor] Cursor position:', pos);
 				handleBranch(pos);
+			}
+			return;
+		}
+
+		// Handle Ctrl+P for parallelizing
+		if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') {
+			e.preventDefault();
+			e.stopPropagation();
+
+			if (editorRef) {
+				const start = editorRef.selectionStart;
+				const end = editorRef.selectionEnd;
+				handleParallelize(start, end);
 			}
 			return;
 		}
@@ -103,7 +133,7 @@
 			onkeydown={handleKeydown}
 			placeholder="Start writing...
 
-Press Ctrl+L to branch at the cursor position."
+Press Ctrl+L to branch, Ctrl+P to parallelize selected text."
 			class="writing-editor w-full h-full resize-none {getFontClass()} {getSizeClass()}"
 			style="background-color: transparent; color: var(--text-primary);"
 			data-placeholder="Start writing..."
@@ -116,6 +146,6 @@ Press Ctrl+L to branch at the cursor position."
 		style="border-color: var(--border-color); color: var(--text-muted);"
 	>
 		<span>{getWordCount()} words in this node</span>
-		<span class="opacity-50">Ctrl+L to branch</span>
+		<span class="opacity-50">Ctrl+L branch | Ctrl+P parallelize</span>
 	</div>
 </div>

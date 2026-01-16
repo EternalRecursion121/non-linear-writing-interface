@@ -12,8 +12,22 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
 		description: 'Branch at cursor',
 		category: 'editing'
 	},
+	{
+		key: 'p',
+		modifiers: ['ctrl'],
+		action: 'parallelize',
+		description: 'Parallelize at selection',
+		category: 'editing'
+	},
 
 	// View shortcuts
+	{
+		key: 'b',
+		modifiers: ['ctrl'],
+		action: 'toggleFileBrowser',
+		description: 'Toggle file browser',
+		category: 'view'
+	},
 	{
 		key: '1',
 		modifiers: ['ctrl'],
@@ -210,8 +224,17 @@ export function createKeyboardHandler(
 			target.tagName === 'TEXTAREA' ||
 			target.isContentEditable;
 
+		// These shortcuts are handled directly by the WritingEditor component
+		// Don't process them globally at all when in an input element
+		const editorHandledShortcuts = ['branch', 'parallelize'];
+
 		for (const shortcut of KEYBOARD_SHORTCUTS) {
 			if (matchShortcut(event, shortcut)) {
+				// Skip editor-handled shortcuts when in input - let the editor handle them
+				if (isInputElement && editorHandledShortcuts.includes(shortcut.action)) {
+					return; // Exit completely, don't prevent default
+				}
+
 				// Allow certain shortcuts even in input elements
 				const globalShortcuts = [
 					'save',
@@ -222,7 +245,7 @@ export function createKeyboardHandler(
 					'writingFull',
 					'dagFull',
 					'sideBySide',
-					'branch'
+					'toggleFileBrowser'
 				];
 
 				if (isInputElement && !globalShortcuts.includes(shortcut.action)) {
@@ -312,6 +335,9 @@ export function createKeyboardHandler(
 						}
 						break;
 					}
+					case 'toggleFileBrowser':
+						uiStore.toggleNodeBrowser();
+						break;
 				}
 
 				return;

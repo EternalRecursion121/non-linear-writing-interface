@@ -2,22 +2,27 @@ import type { WritingNode, WritingEdge, CompilePath } from '$lib/types';
 
 /**
  * Topological sort of nodes
+ * Accepts either a Map or an array of WritingNodes
  */
 export function topologicalSort(
-	nodes: Map<string, WritingNode>,
+	nodes: Map<string, WritingNode> | WritingNode[],
 	edges: WritingEdge[]
 ): string[] {
+	// Convert array to iterable if needed
+	const nodeIterable = Array.isArray(nodes) ? nodes : nodes.values();
+
 	const inDegree = new Map<string, number>();
 	const adjList = new Map<string, string[]>();
 
 	// Initialize
-	for (const node of nodes.values()) {
+	for (const node of nodeIterable) {
 		inDegree.set(node.id, 0);
 		adjList.set(node.id, []);
 	}
 
 	// Build adjacency list and in-degrees
 	for (const edge of edges) {
+		if (!adjList.has(edge.source)) continue; // Skip edges to nodes not in current set
 		const neighbors = adjList.get(edge.source) ?? [];
 		neighbors.push(edge.target);
 		adjList.set(edge.source, neighbors);

@@ -25,26 +25,30 @@
 		writing: WritingFlowNode
 	};
 
-	// Convert project nodes to flow nodes
+	// Convert project nodes to flow nodes (supports nested projects)
 	function getFlowNodes(): Node[] {
-		return projectStore.nodes.map((node) => ({
+		const activeNodes = projectStore.getActiveNodes();
+		return activeNodes.map((node) => ({
 			id: node.id,
 			type: 'writing',
 			position: node.position,
 			data: {
+				title: node.title,
 				content: node.content,
 				planContent: node.planContent,
 				wordCount: projectStore.getWordCount(node.content),
 				wordCountGoal: node.wordCountGoal,
+				hasSubProject: !!node.subProject,
 				isSelected: projectStore.viewState.selectedNodeId === node.id
 			},
 			selected: projectStore.viewState.selectedNodeId === node.id
 		}));
 	}
 
-	// Convert project edges to flow edges
+	// Convert project edges to flow edges (supports nested projects)
 	function getFlowEdges(): Edge[] {
-		return projectStore.edges.map((edge) => ({
+		const activeEdges = projectStore.getActiveEdges();
+		return activeEdges.map((edge) => ({
 			id: edge.id,
 			source: edge.source,
 			target: edge.target,
@@ -90,7 +94,9 @@
 	}
 
 	function handleAutoLayout() {
-		const positions = autoLayout(projectStore.nodes, projectStore.edges);
+		const activeNodes = projectStore.getActiveNodes();
+		const activeEdges = projectStore.getActiveEdges();
+		const positions = autoLayout(activeNodes, activeEdges);
 		const centered = centerNodes(positions, 400, 300);
 
 		for (const [id, pos] of centered) {

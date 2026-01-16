@@ -14,7 +14,8 @@ function createDefaultViewState(): ViewState {
 		zoom: 1,
 		pan: { x: 0, y: 0 },
 		selectedNodeId: null,
-		layout: 'side-by-side'
+		layout: 'side-by-side',
+		projectPath: [] // Root level
 	};
 }
 
@@ -86,9 +87,13 @@ class ProjectStore {
 
 	// Save current state for undo
 	private saveState(): void {
+		// Use JSON parse/stringify to deep clone and strip reactive proxies
+		const nodesSnapshot = JSON.parse(JSON.stringify(Array.from(this._nodesMap.values())));
+		const edgesSnapshot = JSON.parse(JSON.stringify(this._edges));
+
 		this._undoStack.push({
-			nodes: structuredClone(Array.from(this._nodesMap.values())),
-			edges: structuredClone(this._edges)
+			nodes: nodesSnapshot,
+			edges: edgesSnapshot
 		});
 		// Limit undo stack size
 		if (this._undoStack.length > 50) {
@@ -144,6 +149,17 @@ class ProjectStore {
 
 	updateNodeWordCountGoal(id: string, goal: number | undefined): void {
 		this.updateNode(id, { wordCountGoal: goal });
+	}
+
+	renameNode(id: string, title: string): void {
+		this.updateNode(id, { title: title || undefined });
+	}
+
+	// Get display title for a node (title or first line of content)
+	getNodeDisplayTitle(node: WritingNode): string {
+		if (node.title) return node.title;
+		const firstLine = node.content.split('\n')[0].trim();
+		return firstLine.slice(0, 30) || 'Untitled';
 	}
 
 	deleteNode(id: string): void {
@@ -205,9 +221,10 @@ class ProjectStore {
 	undo(): void {
 		const state = this._undoStack.pop();
 		if (state) {
+			// Use JSON parse/stringify to deep clone and strip reactive proxies
 			this._redoStack.push({
-				nodes: structuredClone(Array.from(this._nodesMap.values())),
-				edges: structuredClone(this._edges)
+				nodes: JSON.parse(JSON.stringify(Array.from(this._nodesMap.values()))),
+				edges: JSON.parse(JSON.stringify(this._edges))
 			});
 			this._nodesMap = new Map(state.nodes.map((n) => [n.id, n]));
 			this._edges = state.edges;
@@ -217,9 +234,10 @@ class ProjectStore {
 	redo(): void {
 		const state = this._redoStack.pop();
 		if (state) {
+			// Use JSON parse/stringify to deep clone and strip reactive proxies
 			this._undoStack.push({
-				nodes: structuredClone(Array.from(this._nodesMap.values())),
-				edges: structuredClone(this._edges)
+				nodes: JSON.parse(JSON.stringify(Array.from(this._nodesMap.values()))),
+				edges: JSON.parse(JSON.stringify(this._edges))
 			});
 			this._nodesMap = new Map(state.nodes.map((n) => [n.id, n]));
 			this._edges = state.edges;
@@ -268,6 +286,155 @@ class ProjectStore {
 		this._nodesMap.set(initialNode.id, initialNode);
 		this._viewState.selectedNodeId = initialNode.id;
 	}
+
+	// ==================== Subproject Navigation ====================
+
+	// Get the current project path (safely handles missing projectPath)
+	get projectPath(): string[] {
+		return this._viewState.projectPath || [];
+	}
+
+	// Check if we're at root level
+	get isAtRoot(): boolean {
+		return this.projectPath.length === 0;
+	}
+
+	// Get nodes at the current navigation depth
+	getActiveNodes(): WritingNode[] {
+		const path = this.projectPath;
+		if (path.length === 0) {
+			return this.nodes;
+		}
+
+		// Navigate through the path to get to the current subproject
+		let currentNodes = this.nodes;
+		let currentEdges = this._edges;
+
+		for (const nodeId of path) {
+			const node = currentNodes.find((n) => n.id === nodeId);
+			if (node?.subProject) {
+				currentNodes = node.subProject.nodes;
+				currentEdges = node.subProject.edges;
+			} else {
+				return [];
+			}
+		}
+
+		return currentNodes;
+	}
+
+	// Get edges at the current navigation depth
+	getActiveEdges(): WritingEdge[] {
+		const path = this.projectPath;
+		if (path.length === 0) {
+			return this._edges;
+		}
+
+		let currentNodes = this.nodes;
+		let currentEdges = this._edges;
+
+		for (const nodeId of path) {
+			const node = currentNodes.find((n) => n.id === nodeId);
+			if (node?.subProject) {
+				currentNodes = node.subProject.nodes;
+				currentEdges = node.subProject.edges;
+			} else {
+				return [];
+			}
+		}
+
+		return currentEdges;
+	}
+
+	// Navigate into a node's subproject
+	drillInto(nodeId: string): void {
+		const node = this.getNode(nodeId);
+		if (node?.subProject) {
+			this._viewState.projectPath = [...this.projectPath, nodeId];
+			this._viewState.selectedNodeId = null;
+
+			// Select first node in subproject if any
+			if (node.subProject.nodes.length > 0) {
+				this._viewState.selectedNodeId = node.subProject.nodes[0].id;
+			}
+		}
+	}
+
+	// Navigate up one level
+	drillUp(): void {
+		const currentPath = this.projectPath;
+		if (currentPath.length > 0) {
+			const parentId = currentPath[currentPath.length - 1];
+			this._viewState.projectPath = currentPath.slice(0, -1);
+			this._viewState.selectedNodeId = parentId;
+		}
+	}
+
+	// Navigate to a specific depth in the path
+	drillToDepth(depth: number): void {
+		const currentPath = this.projectPath;
+		if (depth >= 0 && depth <= currentPath.length) {
+			const parentId =
+				depth > 0 ? currentPath[depth - 1] : this.nodes[0]?.id || null;
+			this._viewState.projectPath = currentPath.slice(0, depth);
+			this._viewState.selectedNodeId = parentId;
+		}
+	}
+
+	// Create a subproject for a node
+	createSubProject(nodeId: string): void {
+		this.saveState();
+		const node = this._nodesMap.get(nodeId);
+		if (node && !node.subProject) {
+			const initialSubNode: WritingNode = {
+				id: nanoid(),
+				content: '',
+				planContent: node.planContent,
+				position: { x: 250, y: 100 },
+				createdAt: Date.now(),
+				updatedAt: Date.now()
+			};
+
+			this._nodesMap.set(nodeId, {
+				...node,
+				subProject: {
+					nodes: [initialSubNode],
+					edges: []
+				},
+				updatedAt: Date.now()
+			});
+		}
+	}
+
+	// Check if a node has a subproject
+	hasSubProject(nodeId: string): boolean {
+		const node = this._nodesMap.get(nodeId);
+		return !!node?.subProject;
+	}
+
+	// Get breadcrumb path for display
+	getBreadcrumbPath(): { id: string; title: string }[] {
+		const path: { id: string; title: string }[] = [];
+
+		let currentNodes = this.nodes;
+
+		for (const nodeId of this.projectPath) {
+			const node = currentNodes.find((n) => n.id === nodeId);
+			if (node) {
+				path.push({
+					id: node.id,
+					title: this.getNodeDisplayTitle(node)
+				});
+				if (node.subProject) {
+					currentNodes = node.subProject.nodes;
+				}
+			}
+		}
+
+		return path;
+	}
+
+	// ==================== Word Count ====================
 
 	// Get total word count
 	get totalWordCount(): number {

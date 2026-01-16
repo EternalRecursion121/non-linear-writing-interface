@@ -1,11 +1,13 @@
 <script lang="ts">
 	import { projectStore } from '$lib/stores/project.svelte';
 	import type { Theme } from '$lib/types';
+	import { Sun, Moon, BookOpen } from 'lucide-svelte';
+	import type { ComponentType } from 'svelte';
 
-	const themes: { id: Theme; icon: string; label: string }[] = [
-		{ id: 'light', icon: '☀️', label: 'Light' },
-		{ id: 'dark', icon: '🌙', label: 'Dark' },
-		{ id: 'sepia', icon: '📜', label: 'Sepia' }
+	const themes: { id: Theme; icon: ComponentType; label: string }[] = [
+		{ id: 'light', icon: Sun, label: 'Light' },
+		{ id: 'dark', icon: Moon, label: 'Dark' },
+		{ id: 'sepia', icon: BookOpen, label: 'Sepia' }
 	];
 
 	function cycleTheme() {
@@ -27,6 +29,6 @@
 	onclick={cycleTheme}
 	title="Toggle theme"
 >
-	<span>{getCurrentTheme().icon}</span>
+	<svelte:component this={getCurrentTheme().icon} size={14} />
 	<span>{getCurrentTheme().label}</span>
 </button>

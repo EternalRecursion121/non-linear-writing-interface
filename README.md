@@ -2,13 +2,17 @@
 
 A keyboard-native, node-based writing application for crafting branching narratives. Built with SvelteKit, TypeScript, and Tailwind CSS.
 
+![Writing Interface](docs/screenshots/Screenshot%202026-01-17%20at%2010.50.45.png)
+
+![DAG View](docs/screenshots/Screenshot%202026-01-17%20at%2010.51.05.png)
+
 ## Features
 
 ### Branching & Parallelization
-- **Branch (Ctrl+L)**: Split your writing at the cursor to explore alternative directions
+- **Branch (Ctrl+Enter)**: Split your writing at the cursor to explore alternative directions
   - Original node becomes a checkpoint
   - Creates two child nodes: one with full content, one for alternative writing
-- **Parallelize (Ctrl+P)**: Create a branch with highlighted text removed
+- **Parallelize (Ctrl+/)**: Create a branch with highlighted text removed
   - Original stays unchanged
   - New branch contains content without the selected text
 

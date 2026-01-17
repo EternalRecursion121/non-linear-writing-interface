@@ -39,8 +39,8 @@ A keyboard-native, node-based writing application for crafting branching narrati
 
 | Shortcut | Action |
 |----------|--------|
-| `Ctrl+L` | Branch at cursor |
-| `Ctrl+P` | Parallelize (remove highlighted text) |
+| `Ctrl+Enter` | Branch at cursor |
+| `Ctrl+/` | Parallelize (create branch with highlighted text removed) |
 | `Ctrl+1` | Full-screen planning pane |
 | `Ctrl+2` | Full-screen writing pane |
 | `Ctrl+3` | Full-screen DAG view |

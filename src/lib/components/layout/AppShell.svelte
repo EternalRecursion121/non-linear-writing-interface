@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { nanoid } from 'nanoid';
 	import { projectStore } from '$lib/stores/project.svelte';
 	import { uiStore } from '$lib/stores/ui.svelte';
 	import MainToolbar from '$lib/components/toolbar/MainToolbar.svelte';
@@ -9,7 +10,7 @@
 	import CompilePanel from '$lib/components/dag/CompilePanel.svelte';
 	import ToastContainer from '$lib/components/overlays/ToastContainer.svelte';
 	import { createKeyboardHandler } from '$lib/utils/keyboard';
-	import { branchAtCursor, parallelizeAtSelection, parallelizeAtCursor } from '$lib/utils/branching';
+	import { branchAtCursor, parallelizeAtSelection } from '$lib/utils/branching';
 	import { saveProjectToFile, saveToLocalStorage } from '$lib/utils/persistence';
 	import { onMount } from 'svelte';
 	import { Check, Circle } from 'lucide-svelte';
@@ -100,40 +101,32 @@
 			// Add edge from original to new branch
 			projectStore.addEdge(result.originalNode.id, branchNode.id);
 
-			// Select the new branch node
-			projectStore.selectNode(branchNode.id);
-			uiStore.setEditing(true);
+			// Don't change selection - stay on original node to preserve cursor
 			uiStore.showToast('Branch created (highlighted text removed)', 'success');
 		} else {
-			// No selection - try to insert parallel path to existing child
-			const children = projectStore.getChildren(selectedNode.id);
-			const result = parallelizeAtCursor(
-				selectedNode,
-				selectionStart,
-				selectedNode.position,
-				children,
-				projectStore.edges
-			);
+			// No selection - create a copy of the full content as a new branch
+			// Original stays unchanged
+			console.log('[AppShell] No selection, creating full copy branch');
 
-			if (result) {
-				const emptyPathNode = projectStore.addNode(result.emptyPathNode);
+			const branchPosition = {
+				x: selectedNode.position.x + 150,
+				y: selectedNode.position.y + 150
+			};
 
-				// Add new edges
-				for (const edge of result.newEdges) {
-					if (edge.source === selectedNode.id) {
-						projectStore.addEdge(selectedNode.id, emptyPathNode.id);
-					} else {
-						projectStore.addEdge(emptyPathNode.id, edge.target);
-					}
-				}
+			const branchNode = projectStore.addNode({
+				id: nanoid(),
+				content: selectedNode.content, // Full copy
+				planContent: selectedNode.planContent,
+				position: branchPosition,
+				createdAt: Date.now(),
+				updatedAt: Date.now()
+			});
 
-				projectStore.selectNode(emptyPathNode.id);
-				uiStore.setEditing(true);
-				uiStore.showToast('Parallel path added', 'success');
-			} else {
-				// No children - just do a regular branch
-				handleBranch(selectionStart);
-			}
+			// Add edge from original to new branch
+			projectStore.addEdge(selectedNode.id, branchNode.id);
+
+			// Don't change selection - stay on original node
+			uiStore.showToast('Branch created (full copy)', 'success');
 		}
 	}
 

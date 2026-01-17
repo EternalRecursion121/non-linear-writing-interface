@@ -6,14 +6,14 @@ import { getNextNode, getPreviousNode } from './dag';
 export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
 	// Branching
 	{
-		key: 'l',
+		key: 'Enter',
 		modifiers: ['ctrl'],
 		action: 'branch',
 		description: 'Branch at cursor',
 		category: 'editing'
 	},
 	{
-		key: 'p',
+		key: '/',
 		modifiers: ['ctrl'],
 		action: 'parallelize',
 		description: 'Parallelize at selection',

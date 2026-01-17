@@ -61,24 +61,20 @@
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
-		console.log('[WritingEditor] keydown:', e.key, 'ctrl:', e.ctrlKey, 'meta:', e.metaKey);
-
-		// Handle Ctrl+L for branching
-		if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'l') {
-			console.log('[WritingEditor] Ctrl+L detected! Branching...');
+		// Handle Ctrl+Enter for branching
+		if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
 			e.preventDefault();
 			e.stopPropagation();
 
 			if (editorRef) {
 				const pos = editorRef.selectionStart;
-				console.log('[WritingEditor] Cursor position:', pos);
 				handleBranch(pos);
 			}
 			return;
 		}
 
-		// Handle Ctrl+P for parallelizing
-		if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') {
+		// Handle Ctrl+/ for parallelizing
+		if ((e.ctrlKey || e.metaKey) && e.key === '/') {
 			e.preventDefault();
 			e.stopPropagation();
 
@@ -133,7 +129,7 @@
 			onkeydown={handleKeydown}
 			placeholder="Start writing...
 
-Press Ctrl+L to branch, Ctrl+P to parallelize selected text."
+Press Ctrl+Enter to branch, Ctrl+/ to parallelize."
 			class="writing-editor w-full h-full resize-none {getFontClass()} {getSizeClass()}"
 			style="background-color: transparent; color: var(--text-primary);"
 			data-placeholder="Start writing..."
@@ -146,6 +142,6 @@ Press Ctrl+L to branch, Ctrl+P to parallelize selected text."
 		style="border-color: var(--border-color); color: var(--text-muted);"
 	>
 		<span>{getWordCount()} words in this node</span>
-		<span class="opacity-50">Ctrl+L branch | Ctrl+P parallelize</span>
+		<span class="opacity-50">Ctrl+Enter branch | Ctrl+/ parallelize</span>
 	</div>
 </div>

@@ -1,72 +1,43 @@
 <script lang="ts">
+	import PaneHeader from '$lib/components/layout/PaneHeader.svelte';
 	import { projectStore } from '$lib/stores/project.svelte';
 	import { uiStore } from '$lib/stores/ui.svelte';
-	import PaneHeader from '$lib/components/layout/PaneHeader.svelte';
 
-	let textareaRef: HTMLTextAreaElement;
 	let localContent = $state('');
 
-	// Sync with selected node's plan content
 	$effect(() => {
-		const node = projectStore.selectedNode;
-		if (node) {
-			localContent = node.planContent;
-		} else {
-			localContent = '';
-		}
+		localContent = projectStore.selectedNode?.planContent ?? '';
 	});
 
-	function handleInput(e: Event) {
-		const target = e.target as HTMLTextAreaElement;
+	function handleInput(event: Event) {
+		const target = event.target as HTMLTextAreaElement;
 		localContent = target.value;
-
-		if (projectStore.selectedNode) {
-			projectStore.updateNodePlanContent(projectStore.selectedNode.id, localContent);
-			uiStore.setAutosaveStatus('unsaved');
-		}
-	}
-
-	function handleKeydown(e: KeyboardEvent) {
-		// Ctrl+L for branching is handled globally
-		// Allow normal text editing here
-	}
-
-	// Get font and size classes
-	function getFontClass(): string {
-		return `font-${projectStore.settings.fontFamily}`;
-	}
-
-	function getSizeClass(): string {
-		return `text-size-${projectStore.settings.fontSize}`;
+		projectStore.updateSelectedNodePlanContent(target.value);
+		uiStore.setAutosaveStatus('unsaved');
 	}
 </script>
 
 <div class="h-full flex flex-col">
 	<PaneHeader
 		title="Planning"
-		subtitle={projectStore.selectedNode ? `Node ${Array.from(projectStore.nodesMap.keys()).indexOf(projectStore.selectedNode.id) + 1}` : ''}
+		subtitle={projectStore.selectedNode ? `Node ${projectStore.activeNodes.findIndex((node) => node.id === projectStore.selectedNode?.id) + 1}` : ''}
 	/>
 
-	<div class="flex-1 overflow-auto p-4">
+	<div class="flex-1 overflow-auto px-5 py-4">
 		{#if projectStore.selectedNode}
 			<textarea
-				bind:this={textareaRef}
 				value={localContent}
 				oninput={handleInput}
-				onkeydown={handleKeydown}
 				placeholder="Write your planning notes here...
 
 Ideas, outlines, character notes, plot points - anything that helps you write.
 
 This content will be copied to child nodes when you branch."
-				class="w-full h-full resize-none outline-none {getFontClass()} {getSizeClass()}"
-				style="background-color: transparent; color: var(--text-primary);"
+				class="planning-editor shell-textarea plain h-full w-full px-0.5 py-0.5 outline-none font-{projectStore.settings.fontFamily} text-size-{projectStore.settings.fontSize}"
 			></textarea>
 		{:else}
 			<div class="flex items-center justify-center h-full">
-				<p style="color: var(--text-muted);">
-					Select a node to edit its planning notes
-				</p>
+				<p class="shell-empty-state text-xs">Select a node to edit its planning notes</p>
 			</div>
 		{/if}
 	</div>

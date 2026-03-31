@@ -9,15 +9,15 @@
 </script>
 
 <div
-	class="flex items-center justify-between px-4 py-2 border-b"
-	style="background-color: var(--bg-tertiary); border-color: var(--border-color);"
+	class="flex items-center justify-between border-b px-4 py-2.5"
+	style="border-color: var(--border-color);"
 >
-	<div class="flex items-center gap-2">
-		<h3 class="font-medium text-sm" style="color: var(--text-primary);">
+	<div class="flex items-center gap-2.5">
+		<h3 class="text-[13px] font-medium" style="color: var(--text-primary);">
 			{title}
 		</h3>
 		{#if subtitle}
-			<span class="text-xs" style="color: var(--text-muted);">
+			<span class="text-[11px]" style="color: var(--text-muted);">
 				{subtitle}
 			</span>
 		{/if}
@@ -27,8 +27,7 @@
 		<div class="flex items-center gap-1">
 			{#each actions as action}
 				<button
-					class="px-2 py-1 text-xs rounded hover:opacity-80 transition-opacity"
-					style="background-color: var(--bg-secondary); color: var(--text-secondary);"
+					class="shell-button px-2 py-1 text-[11px]"
 					onclick={action.onclick}
 				>
 					{#if action.icon}

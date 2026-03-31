@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { projectStore } from '$lib/stores/project.svelte';
-	import type { Theme } from '$lib/types';
-	import { Sun, Moon, BookOpen } from 'lucide-svelte';
+	import { BookOpen, Moon, Sun } from 'lucide-svelte';
 	import type { ComponentType } from 'svelte';
+	import type { Theme } from '$lib/types/project';
+	import { projectStore } from '$lib/stores/project.svelte';
 
 	const themes: { id: Theme; icon: ComponentType; label: string }[] = [
 		{ id: 'light', icon: Sun, label: 'Light' },
@@ -11,24 +11,21 @@
 	];
 
 	function cycleTheme() {
-		const currentIndex = themes.findIndex((t) => t.id === projectStore.settings.theme);
-		const nextIndex = (currentIndex + 1) % themes.length;
-		projectStore.updateSettings({ theme: themes[nextIndex].id });
-	}
-
-	function getCurrentTheme() {
-		return themes.find((t) => t.id === projectStore.settings.theme) ?? themes[0];
+		const currentIndex = themes.findIndex((theme) => theme.id === projectStore.settings.theme);
+		const nextTheme = themes[(currentIndex + 1) % themes.length] ?? themes[0];
+		projectStore.setTheme(nextTheme.id);
 	}
 </script>
 
 <button
-	class="flex items-center gap-1 px-2 py-1 text-xs rounded border"
-	style="background-color: var(--bg-primary);
-	       border-color: var(--border-color);
-	       color: var(--text-secondary);"
+	class="shell-button text-xs"
 	onclick={cycleTheme}
 	title="Toggle theme"
 >
-	<svelte:component this={getCurrentTheme().icon} size={14} />
-	<span>{getCurrentTheme().label}</span>
+	<svelte:component
+		this={themes.find((theme) => theme.id === projectStore.settings.theme)?.icon ?? themes[0].icon}
+		size={13}
+		strokeWidth={2}
+	/>
+	<span>{themes.find((theme) => theme.id === projectStore.settings.theme)?.label ?? themes[0].label}</span>
 </button>

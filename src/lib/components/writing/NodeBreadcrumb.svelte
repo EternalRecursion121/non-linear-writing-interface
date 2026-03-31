@@ -1,90 +1,64 @@
 <script lang="ts">
-	import { projectStore } from '$lib/stores/project.svelte';
-	import { getPathToNode } from '$lib/utils/dag';
 	import { Folder } from 'lucide-svelte';
+	import { projectStore } from '$lib/stores/project.svelte';
 
-	// Get project nesting path (when inside subprojects)
 	const projectPath = $derived(projectStore.getBreadcrumbPath());
-	const isNested = $derived(projectPath.length > 0);
 
-	// Get path from root to current node within current level
-	function getNodePath(): { id: string; title: string }[] {
-		const selectedId = projectStore.viewState.selectedNodeId;
-		if (!selectedId) return [];
+	function getNodePath() {
+		const selectedNodeId = projectStore.selectedNode?.id;
+		if (!selectedNodeId) {
+			return [];
+		}
 
-		// Get active nodes and edges at current level
-		const activeNodes = projectStore.getActiveNodes();
-		const activeEdges = projectStore.getActiveEdges();
-
-		// Create a map for quick lookup
-		const nodeMap = new Map(activeNodes.map((n) => [n.id, n]));
-
-		// Find path to current node
-		const pathIds = getPathToNode(selectedId, nodeMap, activeEdges);
-
-		return pathIds.map((id) => {
-			const node = nodeMap.get(id);
+		return projectStore.getNodePath(selectedNodeId).map((nodeId) => {
+			const node = projectStore.activeNodes.find((candidate) => candidate.id === nodeId);
 			return {
-				id,
+				id: nodeId,
 				title: node ? projectStore.getNodeDisplayTitle(node) : 'Unknown'
 			};
 		});
 	}
 
-	function selectNode(id: string) {
-		projectStore.selectNode(id);
-	}
-
-	function drillToDepth(depth: number) {
-		projectStore.drillToDepth(depth);
-	}
-
-	let nodePath = $derived(getNodePath());
+	const nodePath = $derived(getNodePath());
 </script>
 
 <div
-	class="px-4 py-2 flex items-center gap-1 text-sm border-b overflow-x-auto"
-	style="background-color: var(--bg-secondary); border-color: var(--border-color);"
+	class="flex items-center gap-1 overflow-x-auto border-b px-4 py-1.5 text-[11px]"
+	style="border-color: var(--border-color);"
 >
-	<!-- Project nesting path (if inside subprojects) -->
-	{#if isNested}
+	{#if projectPath.length > 0}
 		<button
-			class="px-2 py-0.5 rounded hover:opacity-80 transition-opacity whitespace-nowrap"
-			style="color: var(--accent-color); background-color: transparent;"
-			onclick={() => drillToDepth(0)}
+			class="shell-button ghost whitespace-nowrap px-2 py-1 text-[11px]"
+			onclick={() => projectStore.drillToDepth(0)}
 			title="Go to root project"
 		>
 			Root
 		</button>
 
-		{#each projectPath as crumb, i}
-			<span style="color: var(--text-muted);">/</span>
+		{#each projectPath as crumb, index}
+			<span class="shell-hint opacity-40">/</span>
 			<button
-				class="px-2 py-0.5 rounded hover:opacity-80 transition-opacity whitespace-nowrap flex items-center gap-1"
-				style="color: var(--accent-color); background-color: transparent;"
-				onclick={() => drillToDepth(i + 1)}
+				class="shell-button ghost flex items-center gap-1 whitespace-nowrap px-2 py-1 text-[11px]"
+				onclick={() => projectStore.drillToDepth(index + 1)}
 				title="Go to {crumb.title}"
 			>
-				<Folder size={12} />
+				<Folder size={11} />
 				{crumb.title}
 			</button>
 		{/each}
 
-		<!-- Separator between project path and node path -->
-		<span style="color: var(--border-color);" class="mx-1">|</span>
+		<span class="mx-1.5 h-3 w-px" style="background: var(--border-color);"></span>
 	{/if}
 
-	<!-- Node path within current level -->
-	{#each nodePath as item, i}
-		{#if i > 0}
-			<span style="color: var(--text-muted);">→</span>
+	{#each nodePath as item, index}
+		{#if index > 0}
+			<span class="shell-hint opacity-40">→</span>
 		{/if}
 		<button
-			class="px-2 py-0.5 rounded hover:opacity-80 transition-opacity whitespace-nowrap max-w-[120px] truncate"
-			class:font-medium={i === nodePath.length - 1}
-			style="color: {i === nodePath.length - 1 ? 'var(--accent-color)' : 'var(--text-secondary)'};
-			       background-color: {i === nodePath.length - 1 ? 'var(--bg-tertiary)' : 'transparent'};"
-			onclick={() => selectNode(item.id)}
+			class="shell-button whitespace-nowrap px-2 py-1 max-w-[120px] truncate text-[11px]"
+			class:active={index === nodePath.length - 1}
+			class:ghost={index !== nodePath.length - 1}
+			onclick={() => projectStore.selectNode(item.id)}
 			title={item.title}
 		>
 			{item.title}

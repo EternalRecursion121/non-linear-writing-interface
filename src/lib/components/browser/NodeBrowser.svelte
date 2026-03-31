@@ -1,104 +1,72 @@
 <script lang="ts">
+	import { Search } from 'lucide-svelte';
+	import { topologicalSort } from '$lib/domain/project/compile';
 	import { projectStore } from '$lib/stores/project.svelte';
 	import { uiStore } from '$lib/stores/ui.svelte';
-	import { topologicalSort } from '$lib/utils/dag';
 	import NodeBrowserItem from './NodeBrowserItem.svelte';
 	import { ArrowUp } from 'lucide-svelte';
 
 	let searchQuery = $state('');
 
-	// Get nodes in topological order for display
-	const sortedNodes = $derived(() => {
-		const activeNodes = projectStore.getActiveNodes();
-		const activeEdges = projectStore.getActiveEdges();
-		const sortedIds = topologicalSort(activeNodes, activeEdges);
+	const sortedNodes = $derived.by(() => {
+		const nodeIds = topologicalSort(projectStore.activeGraph);
+		let nodes = nodeIds
+			.map((nodeId) => projectStore.activeNodes.find((node) => node.id === nodeId))
+			.filter((node): node is NonNullable<typeof node> => !!node);
 
-		let nodes = sortedIds
-			.map((id) => activeNodes.find((n) => n.id === id))
-			.filter((n): n is NonNullable<typeof n> => !!n);
-
-		// Filter by search query if present
 		if (searchQuery.trim()) {
 			const query = searchQuery.toLowerCase();
 			nodes = nodes.filter((node) => {
 				const title = projectStore.getNodeDisplayTitle(node).toLowerCase();
-				const content = node.content.toLowerCase();
-				return title.includes(query) || content.includes(query);
+				return title.includes(query) || node.content.toLowerCase().includes(query);
 			});
 		}
 
 		return nodes;
 	});
 
-	// Get sorted node IDs for multi-select range calculation
-	const sortedNodeIds = $derived(() => sortedNodes().map((n) => n.id));
-
-	// Breadcrumb for nested navigation
+	const sortedNodeIds = $derived.by(() => sortedNodes.map((node) => node.id));
 	const breadcrumbPath = $derived(projectStore.getBreadcrumbPath());
 
-	function handleDrillUp() {
-		projectStore.drillUp();
-	}
-
-	function handleDrillToDepth(depth: number) {
-		projectStore.drillToDepth(depth);
-	}
-
 	function handleAddNode() {
-		const selectedNode = projectStore.selectedNode;
-		const position = selectedNode
-			? { x: selectedNode.position.x + 50, y: selectedNode.position.y + 150 }
-			: { x: 250, y: 100 };
-
-		const newNode = projectStore.addNode({ position });
-
-		if (selectedNode) {
-			projectStore.addEdge(selectedNode.id, newNode.id);
-		}
-
-		projectStore.selectNode(newNode.id);
+		projectStore.addChildNode();
 		uiStore.showToast('Node added', 'success');
 	}
 </script>
 
-<div class="h-full flex flex-col" style="background-color: var(--bg-secondary);">
-	<!-- Header -->
+<div class="h-full flex flex-col">
 	<div
-		class="px-3 py-2 border-b flex items-center justify-between"
+		class="flex items-center justify-between border-b px-4 py-2.5"
 		style="border-color: var(--border-color);"
 	>
-		<span class="text-xs font-medium" style="color: var(--text-secondary);">
-			Files
-		</span>
+		<span class="shell-label">Files</span>
 		<button
 			onclick={handleAddNode}
-			class="text-xs px-1.5 py-0.5 rounded transition-colors hover:opacity-80"
-			style="background-color: var(--accent-color); color: white;"
+			class="shell-button primary px-2.5 py-1 text-[11px]"
 			title="Add new node"
 		>
 			+ New
 		</button>
 	</div>
 
-	<!-- Nested Navigation Breadcrumb -->
 	{#if breadcrumbPath.length > 0}
 		<div
-			class="px-3 py-1.5 border-b flex items-center gap-1 text-xs overflow-x-auto"
+			class="flex items-center gap-1 overflow-x-auto border-b px-4 py-1.5 text-[11px]"
 			style="border-color: var(--border-color);"
 		>
 			<button
-				onclick={() => handleDrillToDepth(0)}
-				class="hover:underline"
-				style="color: var(--accent-color);"
+				onclick={() => projectStore.drillToDepth(0)}
+				class="shell-button ghost px-2 py-1 text-[11px]"
 			>
 				Root
 			</button>
-			{#each breadcrumbPath as crumb, i}
-				<span style="color: var(--text-muted);">/</span>
+			{#each breadcrumbPath as crumb, index}
+				<span class="shell-hint opacity-40">/</span>
 				<button
-					onclick={() => handleDrillToDepth(i + 1)}
-					class="hover:underline truncate max-w-[80px]"
-					style="color: {i === breadcrumbPath.length - 1 ? 'var(--text-primary)' : 'var(--accent-color)'};"
+					onclick={() => projectStore.drillToDepth(index + 1)}
+					class="shell-button truncate px-2 py-1 text-[11px]"
+					class:primary={index !== breadcrumbPath.length - 1}
+					class:ghost={index === breadcrumbPath.length - 1}
 					title={crumb.title}
 				>
 					{crumb.title}
@@ -107,52 +75,52 @@
 		</div>
 	{/if}
 
-	<!-- Search -->
-	<div class="px-2 py-2 border-b" style="border-color: var(--border-color);">
-		<input
-			type="text"
-			bind:value={searchQuery}
-			placeholder="Search nodes..."
-			class="w-full px-2 py-1 text-xs rounded border"
-			style="background-color: var(--bg-primary);
-			       border-color: var(--border-color);
-			       color: var(--text-primary);"
-		/>
+	<div class="border-b px-3.5 py-2" style="border-color: var(--border-color);">
+		<div class="relative">
+			<Search size={12} class="absolute left-2 top-1/2 -translate-y-1/2" style="color: var(--text-muted);" />
+			<input
+				type="text"
+				bind:value={searchQuery}
+				placeholder="Search nodes..."
+				class="shell-input plain h-7 w-full pl-7 pr-1 text-[11.5px]"
+			/>
+		</div>
 	</div>
 
-	<!-- Node List -->
 	<div class="flex-1 overflow-y-auto">
 		{#if !projectStore.isAtRoot}
 			<button
-				onclick={handleDrillUp}
-				class="w-full px-3 py-2 text-xs text-left flex items-center gap-2 border-b transition-colors hover:bg-black/5"
-				style="border-color: var(--border-color); color: var(--accent-color);"
+				onclick={() => projectStore.drillUp()}
+				class="flex w-full items-center gap-2 border-b px-4 py-2 text-left text-[11px] transition-colors"
+				style="border-color: var(--border-color); color: var(--text-secondary);"
+				onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--accent-color-light)'}
+				onmouseleave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
 			>
-				<ArrowUp size={14} />
+				<ArrowUp size={13} />
 				<span>Go up to parent</span>
 			</button>
 		{/if}
 
-		{#each sortedNodes() as node}
-			<NodeBrowserItem {node} sortedNodeIds={sortedNodeIds()} />
+		{#each sortedNodes as node}
+			<NodeBrowserItem {node} sortedNodeIds={sortedNodeIds} />
 		{/each}
 
-		{#if sortedNodes().length === 0}
-			<div class="px-3 py-4 text-xs text-center" style="color: var(--text-muted);">
+		{#if sortedNodes.length === 0}
+			<div class="shell-empty-state px-4 py-8 text-[11px]">
 				{searchQuery ? 'No matching nodes' : 'No nodes yet'}
 			</div>
 		{/if}
 	</div>
 
-	<!-- Footer Stats -->
 	<div
-		class="px-3 py-2 border-t text-[10px]"
-		style="border-color: var(--border-color); color: var(--text-muted);"
+		class="flex items-center gap-1.5 border-t px-4 py-2.5 text-[10px]"
+		style="border-color: var(--border-color);"
 	>
 		{#if uiStore.hasMultiSelection}
-			<span style="color: var(--accent-color);">{uiStore.selectedNodeIds.size} selected</span> •
+			<span class="shell-pill accent">{uiStore.selectedNodeIds.size} selected</span>
 		{/if}
-		{sortedNodes().length} node{sortedNodes().length !== 1 ? 's' : ''} •
-		{projectStore.totalWordCount} words total
+		<span class="shell-hint tabular-nums">{sortedNodes.length} node{sortedNodes.length !== 1 ? 's' : ''}</span>
+		<span class="shell-hint opacity-30">·</span>
+		<span class="shell-hint tabular-nums">{projectStore.totalWordCount} words</span>
 	</div>
 </div>

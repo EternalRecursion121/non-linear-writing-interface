@@ -4,11 +4,11 @@ class UIStore {
 	// Layout
 	private _layout = $state<LayoutMode>('side-by-side');
 	private _rightPaneMode = $state<RightPaneMode>('writing');
-	private _planePaneWidth = $state<number>(300);
+	private _planePaneWidth = $state<number>(320);
 
 	// Node Browser
 	private _nodeBrowserOpen = $state<boolean>(true);
-	private _nodeBrowserWidth = $state<number>(200);
+	private _nodeBrowserWidth = $state<number>(230);
 
 	// Multi-select state
 	private _selectedNodeIds = $state<Set<string>>(new Set());

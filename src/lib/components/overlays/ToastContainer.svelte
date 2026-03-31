@@ -1,25 +1,22 @@
 <script lang="ts">
+	import { Check, AlertCircle, Info } from 'lucide-svelte';
 	import { uiStore } from '$lib/stores/ui.svelte';
-
-	function getToastStyle(type: 'info' | 'success' | 'error'): string {
-		switch (type) {
-			case 'success':
-				return 'background-color: var(--success-color); color: white;';
-			case 'error':
-				return 'background-color: var(--error-color); color: white;';
-			default:
-				return 'background-color: var(--bg-tertiary); color: var(--text-primary); border: 1px solid var(--border-color);';
-		}
-	}
 </script>
 
 {#if uiStore.toasts.length > 0}
-	<div class="fixed bottom-4 right-4 z-50 flex flex-col gap-2">
+	<div class="fixed bottom-5 right-5 z-50 flex flex-col gap-2">
 		{#each uiStore.toasts as toast (toast.id)}
 			<div
-				class="px-4 py-2 rounded-lg shadow-lg text-sm toast-enter"
-				style={getToastStyle(toast.type)}
+				class="toast-enter flex items-center gap-2 rounded-[var(--radius-md)] px-3.5 py-2.5 text-[12.5px] font-medium"
+				style="background-color: var(--surface-overlay); color: var(--text-primary); border: 1px solid var(--border-color); box-shadow: var(--shadow-lg);"
 			>
+				{#if toast.type === 'success'}
+					<Check size={14} strokeWidth={2.5} style="color: var(--success-color);" />
+				{:else if toast.type === 'error'}
+					<AlertCircle size={14} strokeWidth={2.5} style="color: var(--error-color);" />
+				{:else}
+					<Info size={14} strokeWidth={2.5} style="color: var(--text-muted);" />
+				{/if}
 				{toast.message}
 			</div>
 		{/each}

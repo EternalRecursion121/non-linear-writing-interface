@@ -1,34 +1,25 @@
 <script lang="ts">
+	import '@xyflow/svelte/dist/style.css';
 	import {
-		SvelteFlow,
+		Background,
 		Controls,
 		MiniMap,
-		Background,
-		type Node,
+		SvelteFlow,
 		type Edge,
-		type NodeTypes,
-		type OnNodeClick,
-		type OnConnect,
-		type OnNodesChange,
-		type OnEdgesChange,
-		useSvelteFlow
+		type Node,
+		type NodeTypes
 	} from '@xyflow/svelte';
-	import '@xyflow/svelte/dist/style.css';
-
-	import { projectStore } from '$lib/stores/project.svelte';
-	import { uiStore } from '$lib/stores/ui.svelte';
-	import { autoLayout, centerNodes } from '$lib/utils/layout';
 	import WritingFlowNode from './WritingFlowNode.svelte';
 	import DAGControls from './DAGControls.svelte';
+	import { projectStore } from '$lib/stores/project.svelte';
+	import { uiStore } from '$lib/stores/ui.svelte';
 
 	const nodeTypes: NodeTypes = {
 		writing: WritingFlowNode
 	};
 
-	// Convert project nodes to flow nodes (supports nested projects)
 	function getFlowNodes(): Node[] {
-		const activeNodes = projectStore.getActiveNodes();
-		return activeNodes.map((node) => ({
+		return projectStore.activeNodes.map((node) => ({
 			id: node.id,
 			type: 'writing',
 			position: node.position,
@@ -39,29 +30,27 @@
 				wordCount: projectStore.getWordCount(node.content),
 				wordCountGoal: node.wordCountGoal,
 				hasSubProject: !!node.subProject,
-				isSelected: projectStore.viewState.selectedNodeId === node.id
+				isSelected: projectStore.selectedNode?.id === node.id
 			},
-			selected: projectStore.viewState.selectedNodeId === node.id
+			selected: projectStore.selectedNode?.id === node.id
 		}));
 	}
 
-	// Convert project edges to flow edges (supports nested projects)
 	function getFlowEdges(): Edge[] {
-		const activeEdges = projectStore.getActiveEdges();
-		return activeEdges.map((edge) => ({
+		return projectStore.activeEdges.map((edge) => ({
 			id: edge.id,
 			source: edge.source,
 			target: edge.target,
 			type: 'smoothstep',
-			animated: projectStore.viewState.selectedNodeId === edge.source ||
-			          projectStore.viewState.selectedNodeId === edge.target
+			animated:
+				projectStore.selectedNode?.id === edge.source ||
+				projectStore.selectedNode?.id === edge.target
 		}));
 	}
 
 	let nodes = $state<Node[]>(getFlowNodes());
 	let edges = $state<Edge[]>(getFlowEdges());
 
-	// Update nodes/edges when project changes
 	$effect(() => {
 		nodes = getFlowNodes();
 	});
@@ -70,69 +59,64 @@
 		edges = getFlowEdges();
 	});
 
-	const onNodeClick: OnNodeClick = (event, node) => {
-		projectStore.selectNode(node.id);
-	};
-
-	const onNodesChange: OnNodesChange = (changes) => {
-		// Handle node position changes
-		for (const change of changes) {
-			if (change.type === 'position' && change.position && !change.dragging) {
-				projectStore.updateNodePosition(change.id, change.position);
-			}
-		}
-	};
-
-	const onConnect: OnConnect = (connection) => {
-		if (connection.source && connection.target && connection.source !== connection.target) {
-			projectStore.addEdge(connection.source, connection.target);
-		}
-	};
-
-	function handlePaneClick() {
-		projectStore.selectNode(null);
+	function handleNodeClick(event: { node: Node }) {
+		projectStore.selectNode(event.node.id);
+		uiStore.setSingleSelection(event.node.id);
 	}
 
-	function handleAutoLayout() {
-		const activeNodes = projectStore.getActiveNodes();
-		const activeEdges = projectStore.getActiveEdges();
-		const positions = autoLayout(activeNodes, activeEdges);
-		const centered = centerNodes(positions, 400, 300);
-
-		for (const [id, pos] of centered) {
-			projectStore.updateNodePosition(id, pos);
+	function handleConnect(connection: { source?: string | null; target?: string | null }) {
+		if (!connection.source || !connection.target) {
+			return;
 		}
 
-		uiStore.showToast('Layout applied', 'info');
+		const result = projectStore.connectNodes(connection.source, connection.target);
+		if (!result.ok) {
+			uiStore.showToast(
+				result.reason === 'cycle'
+					? 'That connection would create a cycle'
+					: result.reason === 'duplicate-edge'
+						? 'That connection already exists'
+						: 'Unable to connect nodes',
+				'error'
+			);
+		}
 	}
 
 	function handleAddNode() {
-		const selectedNode = projectStore.selectedNode;
-		const position = selectedNode
-			? { x: selectedNode.position.x + 50, y: selectedNode.position.y + 150 }
-			: { x: 250, y: 100 };
-
-		const newNode = projectStore.addNode({ position });
-
-		if (selectedNode) {
-			projectStore.addEdge(selectedNode.id, newNode.id);
-		}
-
-		projectStore.selectNode(newNode.id);
+		projectStore.addChildNode();
 		uiStore.showToast('Node added', 'success');
 	}
+
+	function handleAutoLayout() {
+		projectStore.autoLayoutActiveGraph();
+		uiStore.showToast('Layout applied', 'info');
+	}
+
+	$effect(() => {
+		nodes;
+
+		for (const flowNode of nodes) {
+			const storedNode = projectStore.activeNodes.find((node) => node.id === flowNode.id);
+			if (
+				storedNode &&
+				(storedNode.position.x !== flowNode.position.x ||
+					storedNode.position.y !== flowNode.position.y)
+			) {
+				projectStore.updateNodePosition(flowNode.id, flowNode.position);
+			}
+		}
+	});
 </script>
 
-<div class="h-full w-full relative">
+<div class="relative h-full w-full overflow-hidden rounded-[1.4rem]">
 	<SvelteFlow
 		bind:nodes
 		bind:edges
 		{nodeTypes}
 		fitView
-		{onNodeClick}
-		{onNodesChange}
-		{onConnect}
-		onpaneclick={handlePaneClick}
+		onnodeclick={handleNodeClick}
+		onconnect={handleConnect}
+		onpaneclick={() => projectStore.selectNode(null)}
 		defaultEdgeOptions={{ type: 'smoothstep' }}
 	>
 		<Background />
@@ -140,6 +124,5 @@
 		<MiniMap />
 	</SvelteFlow>
 
-	<!-- Custom Controls -->
 	<DAGControls onAutoLayout={handleAutoLayout} onAddNode={handleAddNode} />
 </div>

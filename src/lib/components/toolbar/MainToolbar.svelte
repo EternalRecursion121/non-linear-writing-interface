@@ -1,126 +1,96 @@
 <script lang="ts">
+	import { executeCommand } from '$lib/commands';
 	import { projectStore } from '$lib/stores/project.svelte';
 	import { uiStore } from '$lib/stores/ui.svelte';
 	import FontSelector from './FontSelector.svelte';
 	import ThemeToggle from './ThemeToggle.svelte';
+	import { FolderOpen, Plus, HelpCircle } from 'lucide-svelte';
 
-	function handleNew() {
-		if (confirm('Create a new project? This will clear current work.')) {
-			projectStore.reset();
-			uiStore.showToast('New project created', 'success');
-		}
-	}
-
-	function handleHelp() {
-		uiStore.toggleShortcutOverlay();
-	}
-
-	function handleNameChange(e: Event) {
-		const target = e.target as HTMLInputElement;
+	function handleNameChange(event: Event) {
+		const target = event.target as HTMLInputElement;
 		projectStore.setName(target.value);
 	}
 </script>
 
 <header
-	class="h-12 flex items-center justify-between px-4 border-b"
-	style="background-color: var(--bg-secondary); border-color: var(--border-color);"
+	class="shell-toolbar mx-3 mb-1.5 mt-3 flex h-11 items-center justify-between rounded-[var(--radius-xl)] px-1.5"
 >
-	<!-- Left section: File browser toggle, project name, file operations -->
-	<div class="flex items-center gap-3">
-		<!-- File Browser Toggle -->
+	<div class="flex items-center gap-1">
 		<button
-			class="px-2 py-1 text-xs rounded transition-colors flex items-center gap-1"
-			style="background-color: {uiStore.nodeBrowserOpen ? 'var(--accent-color)' : 'var(--bg-primary)'};
-			       color: {uiStore.nodeBrowserOpen ? 'white' : 'var(--text-secondary)'};
-			       border: 1px solid var(--border-color);"
-			onclick={() => uiStore.toggleNodeBrowser()}
+			class="shell-button text-xs"
+			class:active={uiStore.nodeBrowserOpen}
+			onclick={() => executeCommand('toggle-file-browser')}
 			title="Toggle file browser (Ctrl+B)"
 		>
-			<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-			</svg>
+			<FolderOpen size={13} strokeWidth={2} />
 			Files
 		</button>
+
+		<div class="mx-1 h-4 w-px" style="background: var(--border-color);"></div>
 
 		<input
 			type="text"
 			value={projectStore.name}
 			oninput={handleNameChange}
-			class="bg-transparent border-none outline-none font-medium text-sm w-40"
-			style="color: var(--text-primary);"
+			class="shell-input h-7.5 w-44 border-none bg-transparent px-2.5 text-sm shadow-none"
+			style="font-weight: 600; font-size: 14px; letter-spacing: -0.02em;"
 			placeholder="Project name"
 		/>
 
 		<button
-			class="p-1.5 rounded hover:opacity-70 transition-opacity border-l pl-3"
-			style="color: var(--text-secondary); border-color: var(--border-color);"
-			onclick={handleNew}
+			class="shell-button shell-icon-button"
+			onclick={() => executeCommand('new-project')}
 			title="New project"
 		>
-			<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-			</svg>
+			<Plus size={15} strokeWidth={2} />
 		</button>
 	</div>
 
-	<!-- Center section: View controls -->
-	<div class="flex items-center gap-1">
+	<div class="flex items-center gap-0.5 rounded-[var(--radius-md)] p-[3px]" style="background: var(--surface-inset);">
 		<button
-			class="px-3 py-1 text-xs rounded transition-colors"
-			class:font-medium={uiStore.layout === 'side-by-side'}
-			style="background-color: {uiStore.layout === 'side-by-side' ? 'var(--accent-color)' : 'transparent'};
-			       color: {uiStore.layout === 'side-by-side' ? 'white' : 'var(--text-secondary)'};"
-			onclick={() => uiStore.showSideBySide()}
+			class="shell-button shell-tab text-xs"
+			class:active={uiStore.layout === 'side-by-side'}
+			onclick={() => executeCommand('show-side-by-side')}
 			title="Side-by-side (Ctrl+0)"
 		>
 			Split
 		</button>
 		<button
-			class="px-3 py-1 text-xs rounded transition-colors"
-			class:font-medium={uiStore.layout === 'planning-full'}
-			style="background-color: {uiStore.layout === 'planning-full' ? 'var(--accent-color)' : 'transparent'};
-			       color: {uiStore.layout === 'planning-full' ? 'white' : 'var(--text-secondary)'};"
-			onclick={() => uiStore.showPlanningFull()}
+			class="shell-button shell-tab text-xs"
+			class:active={uiStore.layout === 'planning-full'}
+			onclick={() => executeCommand('show-planning-full')}
 			title="Planning only (Ctrl+1)"
 		>
 			Plan
 		</button>
 		<button
-			class="px-3 py-1 text-xs rounded transition-colors"
-			class:font-medium={uiStore.layout === 'writing-full'}
-			style="background-color: {uiStore.layout === 'writing-full' ? 'var(--accent-color)' : 'transparent'};
-			       color: {uiStore.layout === 'writing-full' ? 'white' : 'var(--text-secondary)'};"
-			onclick={() => uiStore.showWritingFull()}
+			class="shell-button shell-tab text-xs"
+			class:active={uiStore.layout === 'writing-full'}
+			onclick={() => executeCommand('show-writing-full')}
 			title="Writing only (Ctrl+2)"
 		>
 			Write
 		</button>
 		<button
-			class="px-3 py-1 text-xs rounded transition-colors"
-			class:font-medium={uiStore.layout === 'dag-full'}
-			style="background-color: {uiStore.layout === 'dag-full' ? 'var(--accent-color)' : 'transparent'};
-			       color: {uiStore.layout === 'dag-full' ? 'white' : 'var(--text-secondary)'};"
-			onclick={() => uiStore.showDAGFull()}
+			class="shell-button shell-tab text-xs"
+			class:active={uiStore.layout === 'dag-full'}
+			onclick={() => executeCommand('show-dag-full')}
 			title="DAG only (Ctrl+3)"
 		>
 			DAG
 		</button>
 	</div>
 
-	<!-- Right section: Settings -->
-	<div class="flex items-center gap-3">
+	<div class="flex items-center gap-1">
 		<FontSelector />
 		<ThemeToggle />
 
 		<button
-			class="p-1.5 rounded hover:opacity-70 transition-opacity"
-			style="color: var(--text-secondary);"
-			onclick={handleHelp}
+			class="shell-button shell-icon-button"
+			onclick={() => executeCommand('toggle-shortcuts')}
 			title="Keyboard shortcuts (?)"
 		>
-			<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-			</svg>
+			<HelpCircle size={14} strokeWidth={2} />
 		</button>
 	</div>
 </header>

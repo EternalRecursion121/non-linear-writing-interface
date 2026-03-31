@@ -1,38 +1,29 @@
 <script lang="ts">
 	import { uiStore } from '$lib/stores/ui.svelte';
+	import NodeBrowser from '$lib/components/browser/NodeBrowser.svelte';
+	import DAGView from '$lib/components/dag/DAGView.svelte';
 	import PlanningPane from '$lib/components/writing/PlanningPane.svelte';
 	import WritingPane from '$lib/components/writing/WritingPane.svelte';
-	import DAGView from '$lib/components/dag/DAGView.svelte';
-	import NodeBrowser from '$lib/components/browser/NodeBrowser.svelte';
-
-	interface Props {
-		handleBranch: (cursorPosition: number) => void;
-		setBranchCallback: (callback: (cursorPosition: number) => void) => void;
-		handleParallelize: (selectionStart: number, selectionEnd: number) => void;
-		setParallelizeCallback: (callback: (selectionStart: number, selectionEnd: number) => void) => void;
-	}
-
-	let { handleBranch, setBranchCallback, handleParallelize, setParallelizeCallback }: Props = $props();
 
 	let containerRef: HTMLDivElement;
 	let isDraggingPlanning = $state(false);
 	let isDraggingBrowser = $state(false);
 
-	function startDragPlanning(e: MouseEvent) {
+	function startDragPlanning(event: MouseEvent) {
 		isDraggingPlanning = true;
 		document.addEventListener('mousemove', onDragPlanning);
 		document.addEventListener('mouseup', stopDragPlanning);
-		e.preventDefault();
+		event.preventDefault();
 	}
 
-	function onDragPlanning(e: MouseEvent) {
-		if (!isDraggingPlanning || !containerRef) return;
+	function onDragPlanning(event: MouseEvent) {
+		if (!isDraggingPlanning || !containerRef) {
+			return;
+		}
 
 		const rect = containerRef.getBoundingClientRect();
-		// Account for browser pane width if it's open
 		const browserWidth = uiStore.nodeBrowserOpen ? uiStore.nodeBrowserWidth : 0;
-		const newWidth = e.clientX - rect.left - browserWidth - 4; // 4px for resize handle
-		uiStore.setPlanePaneWidth(newWidth);
+		uiStore.setPlanePaneWidth(event.clientX - rect.left - browserWidth - 4);
 	}
 
 	function stopDragPlanning() {
@@ -41,19 +32,20 @@
 		document.removeEventListener('mouseup', stopDragPlanning);
 	}
 
-	function startDragBrowser(e: MouseEvent) {
+	function startDragBrowser(event: MouseEvent) {
 		isDraggingBrowser = true;
 		document.addEventListener('mousemove', onDragBrowser);
 		document.addEventListener('mouseup', stopDragBrowser);
-		e.preventDefault();
+		event.preventDefault();
 	}
 
-	function onDragBrowser(e: MouseEvent) {
-		if (!isDraggingBrowser || !containerRef) return;
+	function onDragBrowser(event: MouseEvent) {
+		if (!isDraggingBrowser || !containerRef) {
+			return;
+		}
 
 		const rect = containerRef.getBoundingClientRect();
-		const newWidth = e.clientX - rect.left;
-		uiStore.setNodeBrowserWidth(newWidth);
+		uiStore.setNodeBrowserWidth(event.clientX - rect.left);
 	}
 
 	function stopDragBrowser() {
@@ -64,100 +56,80 @@
 
 	const isDragging = $derived(isDraggingPlanning || isDraggingBrowser);
 
-	// Determine what to show based on layout mode
 	function getLayoutConfig() {
-		const layout = uiStore.layout;
-
-		if (layout === 'planning-full') {
-			return { showBrowser: false, showPlanning: true, showRight: false, planningFull: true };
+		switch (uiStore.layout) {
+			case 'planning-full':
+				return { showBrowser: false, showPlanning: true, showRight: false, planningFull: true };
+			case 'writing-full':
+				return { showBrowser: false, showPlanning: false, showRight: true };
+			case 'dag-full':
+				return { showBrowser: false, showPlanning: false, showRight: true, forceDag: true };
+			default:
+				return {
+					showBrowser: uiStore.nodeBrowserOpen,
+					showPlanning: true,
+					showRight: true
+				};
 		}
-		if (layout === 'writing-full') {
-			return { showBrowser: false, showPlanning: false, showRight: true, rightFull: true };
-		}
-		if (layout === 'dag-full') {
-			return { showBrowser: false, showPlanning: false, showRight: true, rightFull: true, showDag: true };
-		}
-		// side-by-side - show browser if enabled
-		return { showBrowser: uiStore.nodeBrowserOpen, showPlanning: true, showRight: true };
 	}
 
-	let config = $derived(getLayoutConfig());
+	const config = $derived(getLayoutConfig());
 </script>
 
-<div
-	bind:this={containerRef}
-	class="flex h-full overflow-hidden"
-	class:no-select={isDragging}
->
-	<!-- Node Browser Pane -->
+<div bind:this={containerRef} class="flex h-full gap-2.5 overflow-hidden px-3 pb-1.5" class:no-select={isDragging}>
 	{#if config.showBrowser}
 		<div
-			class="flex-shrink-0 overflow-hidden flex flex-col border-r"
-			style="width: {uiStore.nodeBrowserWidth}px;
-			       background-color: var(--bg-secondary);
-			       border-color: var(--border-color);"
+			class="shell-panel-muted flex flex-shrink-0 flex-col overflow-hidden rounded-[var(--radius-xl)]"
+			style="width: {uiStore.nodeBrowserWidth}px;"
 		>
 			<NodeBrowser />
 		</div>
 
-		<!-- Browser Resize Handle -->
-		<div
-			class="resize-handle w-1 hover:w-1.5 flex-shrink-0 transition-all cursor-col-resize"
-			style="background-color: var(--border-color);"
+		<button
+			type="button"
+			class="resize-handle my-8 w-[3px] flex-shrink-0 rounded-full"
 			onmousedown={startDragBrowser}
-			role="separator"
-			aria-orientation="vertical"
+			aria-label="Resize browser pane"
 			tabindex="-1"
-		></div>
+		></button>
 	{/if}
 
-	<!-- Planning Pane -->
 	{#if config.showPlanning}
 		<div
-			class="flex-shrink-0 overflow-hidden flex flex-col border-r"
-			style="width: {config.planningFull ? '100%' : `${uiStore.planePaneWidth}px`};
-			       background-color: var(--bg-secondary);
-			       border-color: var(--border-color);"
+			class="shell-panel-muted flex flex-shrink-0 flex-col overflow-hidden rounded-[var(--radius-xl)]"
+			style="width: {config.planningFull ? '100%' : `${uiStore.planePaneWidth}px`};"
 		>
 			<PlanningPane />
 		</div>
 	{/if}
 
-	<!-- Planning Resize Handle -->
 	{#if config.showPlanning && config.showRight}
-		<div
-			class="resize-handle w-1 hover:w-1.5 flex-shrink-0 transition-all cursor-col-resize"
-			style="background-color: var(--border-color);"
+		<button
+			type="button"
+			class="resize-handle my-8 w-[3px] flex-shrink-0 rounded-full"
 			onmousedown={startDragPlanning}
-			role="separator"
-			aria-orientation="vertical"
+			aria-label="Resize planning pane"
 			tabindex="-1"
-		></div>
+		></button>
 	{/if}
 
-	<!-- Right Pane (Writing or DAG) -->
 	{#if config.showRight}
-		<div class="flex-1 overflow-hidden flex flex-col">
-			<!-- Pane toggle tabs (only in side-by-side) -->
+		<div class="shell-panel flex flex-1 flex-col overflow-hidden rounded-[var(--radius-xl)]">
 			{#if uiStore.layout === 'side-by-side'}
 				<div
-					class="flex border-b"
-					style="background-color: var(--bg-secondary); border-color: var(--border-color);"
+					class="flex items-center gap-1 border-b px-3 py-2"
+					style="border-color: var(--border-color);"
 				>
 					<button
-						class="px-4 py-2 text-sm font-medium transition-colors"
+						class="shell-button shell-tab text-[12.5px] font-medium"
 						class:active={uiStore.rightPaneMode === 'writing'}
-						style="color: {uiStore.rightPaneMode === 'writing' ? 'var(--accent-color)' : 'var(--text-secondary)'};
-						       border-bottom: 2px solid {uiStore.rightPaneMode === 'writing' ? 'var(--accent-color)' : 'transparent'};"
 						onclick={() => uiStore.setRightPaneMode('writing')}
 					>
 						Writing
 					</button>
 					<button
-						class="px-4 py-2 text-sm font-medium transition-colors"
+						class="shell-button shell-tab text-[12.5px] font-medium"
 						class:active={uiStore.rightPaneMode === 'dag'}
-						style="color: {uiStore.rightPaneMode === 'dag' ? 'var(--accent-color)' : 'var(--text-secondary)'};
-						       border-bottom: 2px solid {uiStore.rightPaneMode === 'dag' ? 'var(--accent-color)' : 'transparent'};"
 						onclick={() => uiStore.setRightPaneMode('dag')}
 					>
 						DAG
@@ -165,12 +137,11 @@
 				</div>
 			{/if}
 
-			<!-- Content -->
 			<div class="flex-1 overflow-hidden">
-				{#if uiStore.layout === 'dag-full' || (uiStore.layout === 'side-by-side' && uiStore.rightPaneMode === 'dag')}
+				{#if config.forceDag || (uiStore.layout === 'side-by-side' && uiStore.rightPaneMode === 'dag')}
 					<DAGView />
 				{:else}
-					<WritingPane {handleBranch} {setBranchCallback} {handleParallelize} {setParallelizeCallback} />
+					<WritingPane />
 				{/if}
 			</div>
 		</div>

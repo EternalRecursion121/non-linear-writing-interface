@@ -1,27 +1,16 @@
 <script lang="ts">
+	import { KEYBOARD_SHORTCUTS, formatShortcut } from '$lib/commands';
 	import { uiStore } from '$lib/stores/ui.svelte';
-	import { KEYBOARD_SHORTCUTS, formatShortcut } from '$lib/utils/keyboard';
 
-	function handleClose() {
-		uiStore.closeShortcutOverlay();
-	}
-
-	function handleKeydown(e: KeyboardEvent) {
-		if (e.key === 'Escape' || e.key === '?') {
-			e.preventDefault();
-			handleClose();
-		}
-	}
-
-	// Group shortcuts by category
 	function getGroupedShortcuts() {
 		const groups = new Map<string, typeof KEYBOARD_SHORTCUTS>();
-
-		// Dedupe shortcuts (some have both ctrl and meta versions)
 		const seen = new Set<string>();
+
 		for (const shortcut of KEYBOARD_SHORTCUTS) {
-			if (seen.has(shortcut.action)) continue;
-			seen.add(shortcut.action);
+			if (seen.has(shortcut.commandId)) {
+				continue;
+			}
+			seen.add(shortcut.commandId);
 
 			const existing = groups.get(shortcut.category) ?? [];
 			existing.push(shortcut);
@@ -32,71 +21,68 @@
 	}
 
 	const groupedShortcuts = getGroupedShortcuts();
-
 	const categoryLabels: Record<string, string> = {
 		navigation: 'Navigation',
 		editing: 'Editing',
 		view: 'View',
-		export: 'Save & Export'
+		project: 'Project'
 	};
 </script>
 
-<svelte:window onkeydown={handleKeydown} />
+<svelte:window onkeydown={(event) => {
+	if (event.key === 'Escape' || event.key === '?') {
+		event.preventDefault();
+		uiStore.closeShortcutOverlay();
+	}
+}} />
 
-<!-- Backdrop -->
 <div
-	class="fixed inset-0 z-50 flex items-center justify-center command-palette-backdrop"
-	style="background-color: rgba(0, 0, 0, 0.5);"
-	onclick={handleClose}
+	class="command-palette-backdrop fixed inset-0 z-50 flex items-center justify-center"
+	style="background: rgba(0, 0, 0, 0.45);"
 	role="dialog"
 	aria-modal="true"
 	tabindex="-1"
 >
-	<!-- Modal -->
+	<button
+		type="button"
+		class="absolute inset-0"
+		style="background: transparent;"
+		aria-label="Close shortcut overlay"
+		onclick={() => uiStore.closeShortcutOverlay()}
+	></button>
+
 	<div
-		class="w-full max-w-2xl rounded-lg shadow-2xl overflow-hidden"
-		style="background-color: var(--bg-primary);"
-		onclick={(e) => e.stopPropagation()}
+		class="shell-modal relative w-full max-w-2xl overflow-hidden rounded-[var(--radius-2xl)]"
 		role="document"
 	>
-		<!-- Header -->
 		<div
 			class="px-6 py-4 border-b flex items-center justify-between"
 			style="border-color: var(--border-color);"
 		>
-			<h2 class="text-lg font-semibold" style="color: var(--text-primary);">
-				Keyboard Shortcuts
-			</h2>
+			<h2 style="font-weight: 650; font-size: 17px; letter-spacing: -0.025em; color: var(--text-primary);">Keyboard Shortcuts</h2>
 			<button
-				class="p-1 rounded hover:opacity-70"
-				style="color: var(--text-muted);"
-				onclick={handleClose}
+				class="shell-button shell-icon-button ghost"
+				onclick={() => uiStore.closeShortcutOverlay()}
 				aria-label="Close"
 			>
-				<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+				<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
 					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
 				</svg>
 			</button>
 		</div>
 
-		<!-- Content -->
 		<div class="p-6 max-h-[70vh] overflow-auto">
-			<div class="grid grid-cols-2 gap-6">
+			<div class="grid grid-cols-2 gap-8">
 				{#each [...groupedShortcuts] as [category, shortcuts]}
 					<div>
-						<h3 class="text-xs font-medium uppercase tracking-wider mb-3" style="color: var(--text-muted);">
+						<h3 class="shell-label mb-3">
 							{categoryLabels[category] ?? category}
 						</h3>
-						<div class="space-y-2">
+						<div class="space-y-1.5">
 							{#each shortcuts as shortcut}
-								<div class="flex items-center justify-between">
-									<span class="text-sm" style="color: var(--text-secondary);">
-										{shortcut.description}
-									</span>
-									<kbd
-										class="px-2 py-1 text-xs rounded font-mono"
-										style="background-color: var(--bg-secondary); color: var(--text-muted);"
-									>
+								<div class="flex items-center justify-between py-1">
+									<span class="text-[12.5px]" style="color: var(--text-secondary);">{shortcut.description}</span>
+									<kbd class="shell-kbd px-2 py-0.5 font-mono text-[10.5px]">
 										{formatShortcut(shortcut)}
 									</kbd>
 								</div>
@@ -107,12 +93,11 @@
 			</div>
 		</div>
 
-		<!-- Footer -->
 		<div
-			class="px-6 py-3 border-t text-xs text-center"
+			class="px-6 py-3 border-t text-[10.5px] text-center"
 			style="border-color: var(--border-color); color: var(--text-muted);"
 		>
-			Press <kbd class="px-1 rounded" style="background-color: var(--bg-secondary);">?</kbd> or <kbd class="px-1 rounded" style="background-color: var(--bg-secondary);">Esc</kbd> to close
+			Press <kbd class="shell-kbd mx-0.5">?</kbd> or <kbd class="shell-kbd mx-0.5">Esc</kbd> to close
 		</div>
 	</div>
 </div>

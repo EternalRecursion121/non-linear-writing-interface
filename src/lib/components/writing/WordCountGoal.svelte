@@ -27,27 +27,27 @@
 </script>
 
 <div
-	class="px-6 py-3 border-t"
-	style="background-color: var(--bg-secondary); border-color: var(--border-color);"
+	class="border-t px-6 py-3.5"
+	style="border-color: var(--border-color);"
 >
-	<div class="flex items-center justify-between mb-1 text-xs">
-		<span style="color: var(--text-secondary);">
+	<div class="flex items-center justify-between mb-1.5 text-[11px]">
+		<span class="font-medium" style="color: var(--text-secondary);">
 			Word count goal
 		</span>
-		<span style="color: var(--text-muted);">
-			{progress.current} / {progress.goal} words
+		<span class="tabular-nums" style="color: var(--text-muted);">
+			{progress.current} / {progress.goal}
 		</span>
 	</div>
 
-	<div class="h-2 rounded-full overflow-hidden" style="background-color: var(--bg-tertiary);">
+	<div class="h-1.5 overflow-hidden rounded-full" style="background-color: var(--surface-inset);">
 		<div
-			class="h-full rounded-full transition-all duration-300 progress-{progress.color}"
-			style="width: {Math.min(progress.percentage, 100)}%;"
+			class="h-full rounded-full progress-{progress.color}"
+			style="width: {Math.min(progress.percentage, 100)}%; transition: width 0.4s var(--ease-out);"
 		></div>
 	</div>
 
 	{#if progress.percentage >= 100}
-		<p class="text-xs mt-1" style="color: {progress.color === 'red' ? 'var(--error-color)' : 'var(--success-color)'};">
+		<p class="text-[10.5px] mt-1.5 font-medium" style="color: {progress.color === 'red' ? 'var(--error-color)' : 'var(--success-color)'};">
 			{#if progress.percentage >= 120}
 				Over goal by {progress.current - progress.goal} words
 			{:else}

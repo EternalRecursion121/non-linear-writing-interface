@@ -1,169 +1,136 @@
 <script lang="ts">
-	import { uiStore } from '$lib/stores/ui.svelte';
-	import { projectStore } from '$lib/stores/project.svelte';
-	import { getCommandPaletteItems } from '$lib/utils/keyboard';
-	import type { CommandPaletteItem } from '$lib/types';
 	import { onMount, tick } from 'svelte';
+	import { getCommandDefinitions } from '$lib/commands';
+	import type { CommandDefinition } from '$lib/types/ui';
+	import { uiStore } from '$lib/stores/ui.svelte';
 
 	let searchInput: HTMLInputElement;
 	let query = $state('');
 	let selectedIndex = $state(0);
 
-	// Get all available commands
-	function getCommands(): CommandPaletteItem[] {
-		const customActions: CommandPaletteItem[] = [
-			{
-				id: 'newProject',
-				label: 'New Project',
-				category: 'export',
-				action: () => {
-					if (confirm('Create a new project?')) {
-						projectStore.reset();
-					}
-				}
-			},
-			{
-				id: 'compile',
-				label: 'Compile Story',
-				shortcut: 'Ctrl+E',
-				category: 'export',
-				action: () => uiStore.openCompileModal()
-			}
-		];
-
-		return getCommandPaletteItems(customActions);
-	}
-
-	// Filter commands based on query
-	function getFilteredCommands(): CommandPaletteItem[] {
-		const commands = getCommands();
-		if (!query.trim()) return commands;
+	function getFilteredCommands(): CommandDefinition[] {
+		const commands = getCommandDefinitions().filter((command) => command.isEnabled?.() ?? true);
+		if (!query.trim()) {
+			return commands;
+		}
 
 		const lowerQuery = query.toLowerCase();
 		return commands.filter(
-			(cmd) =>
-				cmd.label.toLowerCase().includes(lowerQuery) ||
-				cmd.category.toLowerCase().includes(lowerQuery) ||
-				(cmd.shortcut && cmd.shortcut.toLowerCase().includes(lowerQuery))
+			(command) =>
+				command.label.toLowerCase().includes(lowerQuery) ||
+				command.category.toLowerCase().includes(lowerQuery) ||
+				command.shortcut?.toLowerCase().includes(lowerQuery)
 		);
 	}
 
-	let filteredCommands = $derived(getFilteredCommands());
+	const filteredCommands = $derived(getFilteredCommands());
 
-	// Reset selection when query changes
 	$effect(() => {
 		query;
 		selectedIndex = 0;
 	});
 
-	function handleKeydown(e: KeyboardEvent) {
-		switch (e.key) {
+	function executeCommand(command: CommandDefinition) {
+		uiStore.closeCommandPalette();
+		command.run();
+	}
+
+	function handleKeydown(event: KeyboardEvent) {
+		switch (event.key) {
 			case 'ArrowDown':
-				e.preventDefault();
+				event.preventDefault();
 				selectedIndex = Math.min(selectedIndex + 1, filteredCommands.length - 1);
 				break;
 			case 'ArrowUp':
-				e.preventDefault();
+				event.preventDefault();
 				selectedIndex = Math.max(selectedIndex - 1, 0);
 				break;
 			case 'Enter':
-				e.preventDefault();
+				event.preventDefault();
 				if (filteredCommands[selectedIndex]) {
 					executeCommand(filteredCommands[selectedIndex]);
 				}
 				break;
 			case 'Escape':
-				e.preventDefault();
+				event.preventDefault();
 				uiStore.closeCommandPalette();
 				break;
 		}
 	}
 
-	function executeCommand(cmd: CommandPaletteItem) {
-		uiStore.closeCommandPalette();
-		cmd.action();
-	}
-
-	onMount(() => {
-		tick().then(() => {
-			searchInput?.focus();
-		});
-	});
-
-	// Group commands by category
-	function groupByCategory(commands: CommandPaletteItem[]): Map<string, CommandPaletteItem[]> {
-		const groups = new Map<string, CommandPaletteItem[]>();
-		for (const cmd of commands) {
-			const existing = groups.get(cmd.category) ?? [];
-			existing.push(cmd);
-			groups.set(cmd.category, existing);
+	function groupByCategory(commands: CommandDefinition[]): Map<string, CommandDefinition[]> {
+		const groups = new Map<string, CommandDefinition[]>();
+		for (const command of commands) {
+			const existing = groups.get(command.category) ?? [];
+			existing.push(command);
+			groups.set(command.category, existing);
 		}
 		return groups;
 	}
 
-	let groupedCommands = $derived(groupByCategory(filteredCommands));
+	const groupedCommands = $derived(groupByCategory(filteredCommands));
+
+	onMount(() => {
+		tick().then(() => searchInput?.focus());
+	});
 </script>
 
-<!-- Backdrop -->
 <div
-	class="fixed inset-0 z-50 flex items-start justify-center pt-24 command-palette-backdrop"
-	style="background-color: rgba(0, 0, 0, 0.5);"
-	onclick={() => uiStore.closeCommandPalette()}
+	class="command-palette-backdrop fixed inset-0 z-50 flex items-start justify-center pt-[18vh]"
+	style="background: rgba(0, 0, 0, 0.4);"
 	onkeydown={handleKeydown}
 	role="dialog"
 	aria-modal="true"
 	tabindex="-1"
 >
-	<!-- Palette -->
+	<button
+		type="button"
+		class="absolute inset-0"
+		style="background: transparent;"
+		aria-label="Close command palette"
+		onclick={() => uiStore.closeCommandPalette()}
+	></button>
+
 	<div
-		class="w-full max-w-lg rounded-lg shadow-2xl overflow-hidden"
-		style="background-color: var(--bg-primary);"
-		onclick={(e) => e.stopPropagation()}
-		role="listbox"
+		class="shell-modal relative w-full max-w-lg overflow-hidden rounded-[var(--radius-2xl)]"
 	>
-		<!-- Search input -->
-		<div class="p-3 border-b" style="border-color: var(--border-color);">
+		<div class="border-b px-5 py-4" style="border-color: var(--border-color);">
 			<input
 				bind:this={searchInput}
 				bind:value={query}
 				type="text"
-				placeholder="Type a command or search..."
-				class="w-full bg-transparent outline-none text-sm"
-				style="color: var(--text-primary);"
+				placeholder="Type a command..."
+				class="shell-input w-full border-none bg-transparent px-0 text-[14px] shadow-none outline-none"
+				style="font-weight: 450;"
 				onkeydown={handleKeydown}
 			/>
 		</div>
 
-		<!-- Commands list -->
-		<div class="max-h-80 overflow-auto">
+		<div class="max-h-72 overflow-auto py-1" role="listbox" tabindex="0" aria-label="Command results">
 			{#if filteredCommands.length === 0}
-				<div class="p-4 text-center text-sm" style="color: var(--text-muted);">
+				<div class="px-5 py-6 text-center text-sm" style="color: var(--text-muted);">
 					No commands found
 				</div>
 			{:else}
 				{#each [...groupedCommands] as [category, commands]}
-					<div class="px-3 py-2">
-						<p class="text-xs font-medium uppercase tracking-wider mb-1" style="color: var(--text-muted);">
+					<div class="px-2 py-2">
+						<p class="shell-label mb-1.5 px-3">
 							{category}
 						</p>
-						{#each commands as cmd, i}
-							{@const globalIndex = filteredCommands.indexOf(cmd)}
+						{#each commands as command}
+							{@const globalIndex = filteredCommands.indexOf(command)}
 							<button
-								class="w-full text-left px-3 py-2 rounded flex items-center justify-between text-sm"
-								style="background-color: {selectedIndex === globalIndex ? 'var(--bg-tertiary)' : 'transparent'};
-								       color: var(--text-primary);"
-								onclick={() => executeCommand(cmd)}
-								onmouseenter={() => selectedIndex = globalIndex}
+								class="command-item flex w-full items-center justify-between rounded-[var(--radius-md)] px-3 py-2 text-left text-[13px]"
+								class:active={selectedIndex === globalIndex}
+								onclick={() => executeCommand(command)}
+								onmouseenter={() => (selectedIndex = globalIndex)}
 								role="option"
 								aria-selected={selectedIndex === globalIndex}
 							>
-								<span>{cmd.label}</span>
-								{#if cmd.shortcut}
-									<kbd
-										class="px-1.5 py-0.5 text-xs rounded"
-										style="background-color: var(--bg-secondary); color: var(--text-muted);"
-									>
-										{cmd.shortcut}
+								<span style="color: var(--text-primary);">{command.label}</span>
+								{#if command.shortcut}
+									<kbd class="shell-kbd px-1.5 py-0.5">
+										{command.shortcut}
 									</kbd>
 								{/if}
 							</button>
@@ -173,14 +140,24 @@
 			{/if}
 		</div>
 
-		<!-- Footer hint -->
 		<div
-			class="px-3 py-2 border-t text-xs flex items-center gap-4"
-			style="border-color: var(--border-color); color: var(--text-muted);"
+			class="flex items-center gap-4 border-t px-5 py-2.5 text-[10.5px]"
+			style="border-color: var(--border-color);"
 		>
-			<span><kbd class="px-1 rounded" style="background-color: var(--bg-secondary);">↑↓</kbd> Navigate</span>
-			<span><kbd class="px-1 rounded" style="background-color: var(--bg-secondary);">Enter</kbd> Select</span>
-			<span><kbd class="px-1 rounded" style="background-color: var(--bg-secondary);">Esc</kbd> Close</span>
+			<span class="shell-hint"><kbd class="shell-kbd">↑↓</kbd> Navigate</span>
+			<span class="shell-hint"><kbd class="shell-kbd">Enter</kbd> Select</span>
+			<span class="shell-hint"><kbd class="shell-kbd">Esc</kbd> Close</span>
 		</div>
 	</div>
 </div>
+
+<style>
+	.command-item {
+		transition: background-color 0.1s ease;
+	}
+
+	.command-item:hover,
+	.command-item.active {
+		background-color: var(--accent-color-light);
+	}
+</style>

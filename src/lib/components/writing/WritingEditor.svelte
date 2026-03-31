@@ -1,147 +1,89 @@
 <script lang="ts">
+	import { onMount, tick } from 'svelte';
 	import { projectStore } from '$lib/stores/project.svelte';
 	import { uiStore } from '$lib/stores/ui.svelte';
-	import { onMount, tick } from 'svelte';
-
-	interface Props {
-		handleBranch: (cursorPosition: number) => void;
-		setBranchCallback: (callback: (cursorPosition: number) => void) => void;
-		handleParallelize: (selectionStart: number, selectionEnd: number) => void;
-		setParallelizeCallback: (callback: (selectionStart: number, selectionEnd: number) => void) => void;
-	}
-
-	let { handleBranch, setBranchCallback, handleParallelize, setParallelizeCallback }: Props = $props();
 
 	let editorRef: HTMLTextAreaElement;
 	let localContent = $state('');
-	let cursorPosition = $state(0);
-	let selectionStart = $state(0);
-	let selectionEnd = $state(0);
 
-	// Sync content with selected node
 	$effect(() => {
-		const node = projectStore.selectedNode;
-		if (node) {
-			localContent = node.content;
-		} else {
-			localContent = '';
-		}
+		localContent = projectStore.selectedNode?.content ?? '';
 	});
 
-	// Register branch callback
-	$effect(() => {
-		setBranchCallback((pos: number) => {
-			handleBranch(pos);
-		});
-	});
-
-	// Register parallelize callback
-	$effect(() => {
-		setParallelizeCallback((start: number, end: number) => {
-			handleParallelize(start, end);
-		});
-	});
-
-	function handleInput(e: Event) {
-		const target = e.target as HTMLTextAreaElement;
+	function handleInput(event: Event) {
+		const target = event.target as HTMLTextAreaElement;
 		localContent = target.value;
-		cursorPosition = target.selectionStart;
-
-		if (projectStore.selectedNode) {
-			projectStore.updateNodeContent(projectStore.selectedNode.id, localContent);
-			uiStore.setAutosaveStatus('unsaved');
-		}
+		projectStore.updateSelectedNodeContent(target.value);
+		uiStore.setAutosaveStatus('unsaved');
 	}
 
-	function handleSelect(e: Event) {
-		const target = e.target as HTMLTextAreaElement;
-		cursorPosition = target.selectionStart;
-		selectionStart = target.selectionStart;
-		selectionEnd = target.selectionEnd;
-	}
+	function handleKeydown(event: KeyboardEvent) {
+		if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+			event.preventDefault();
+			event.stopPropagation();
 
-	function handleKeydown(e: KeyboardEvent) {
-		// Handle Ctrl+Enter for branching
-		if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-			e.preventDefault();
-			e.stopPropagation();
-
-			if (editorRef) {
-				const pos = editorRef.selectionStart;
-				handleBranch(pos);
+			if (editorRef && projectStore.branchSelectedNode(editorRef.selectionStart)) {
+				uiStore.setEditing(true);
+				uiStore.showToast('Branch created', 'success');
 			}
 			return;
 		}
 
-		// Handle Ctrl+/ for parallelizing
-		if ((e.ctrlKey || e.metaKey) && e.key === '/') {
-			e.preventDefault();
-			e.stopPropagation();
+		if ((event.ctrlKey || event.metaKey) && event.key === '/') {
+			event.preventDefault();
+			event.stopPropagation();
 
-			if (editorRef) {
-				const start = editorRef.selectionStart;
-				const end = editorRef.selectionEnd;
-				handleParallelize(start, end);
+			if (
+				editorRef &&
+				projectStore.parallelizeSelectedNode(
+					editorRef.selectionStart,
+					editorRef.selectionEnd
+				)
+			) {
+				uiStore.showToast(
+					editorRef.selectionStart === editorRef.selectionEnd
+						? 'Branch created (full copy)'
+						: 'Branch created (highlighted text removed)',
+					'success'
+				);
 			}
-			return;
 		}
 	}
 
-	// Focus editor when editing starts
 	$effect(() => {
 		if (uiStore.isEditing && editorRef) {
-			tick().then(() => {
-				editorRef.focus();
-			});
+			tick().then(() => editorRef.focus());
 		}
 	});
 
-	// Get font and size classes
-	function getFontClass(): string {
-		return `font-${projectStore.settings.fontFamily}`;
-	}
-
-	function getSizeClass(): string {
-		return `text-size-${projectStore.settings.fontSize}`;
-	}
-
-	// Calculate word count
-	function getWordCount(): number {
-		if (!localContent) return 0;
-		return localContent.trim().split(/\s+/).filter((w) => w.length > 0).length;
-	}
-
 	onMount(() => {
-		// Auto-focus on mount
-		if (editorRef) {
-			editorRef.focus();
-		}
+		editorRef?.focus();
 	});
 </script>
 
 <div class="h-full flex flex-col">
-	<div class="flex-1 overflow-auto p-6">
+	<div class="flex-1 overflow-auto px-6 py-5">
 		<textarea
 			bind:this={editorRef}
 			value={localContent}
 			oninput={handleInput}
-			onselect={handleSelect}
 			onkeydown={handleKeydown}
 			placeholder="Start writing...
 
 Press Ctrl+Enter to branch, Ctrl+/ to parallelize."
-			class="writing-editor w-full h-full resize-none {getFontClass()} {getSizeClass()}"
-			style="background-color: transparent; color: var(--text-primary);"
-			data-placeholder="Start writing..."
+			class="writing-editor shell-textarea plain h-full w-full px-0.5 py-0.5 font-{projectStore.settings.fontFamily} text-size-{projectStore.settings.fontSize}"
 		></textarea>
 	</div>
 
-	<!-- Word count for current node -->
 	<div
-		class="px-6 py-2 text-xs border-t flex items-center justify-between"
-		style="border-color: var(--border-color); color: var(--text-muted);"
+		class="flex items-center justify-between border-t px-6 py-2.5 text-[10.5px]"
+		style="border-color: var(--border-color);"
 	>
-		<span>{getWordCount()} words in this node</span>
-		<span class="opacity-50">Ctrl+Enter branch | Ctrl+/ parallelize</span>
+		<span class="shell-hint tabular-nums">{projectStore.getWordCount(localContent)} words in this node</span>
+		<span class="shell-hint">
+			<kbd class="shell-kbd">Ctrl+Enter</kbd> branch
+			<span class="mx-1.5 opacity-30">|</span>
+			<kbd class="shell-kbd">Ctrl+/</kbd> parallelize
+		</span>
 	</div>
 </div>
